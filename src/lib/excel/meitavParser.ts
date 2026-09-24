@@ -316,12 +316,35 @@ function shouldImportTransaction(row: Record<string, unknown>): boolean {
   const rawType = String(row.rawType || '').trim();
   const name = String(row.name || '').trim();
   const symbol = cleanSymbol(row.symbol as string, name);
+  const rawSymbol = String(row.symbol || '').trim();
   
   // Skip transactions without meaningful data
   if (!rawType) return false;
   
+  // Skip currency exchange transactions (B USD/ILS, USD/ILS, מט"ח)
+  if (rawType.includes('USD/ILS') || rawType.includes('מט"ח') || rawType.includes('המרה') ||
+      name.includes('USD/ILS') || name.includes('מט"ח')) {
+    console.log(`Skipping currency exchange: ${rawType} - ${name}`);
+    return false;
+  }
+  
+  // Skip if symbol is USD or currency-related
+  if (rawSymbol === 'USD' || rawSymbol === 'ILS' || rawSymbol.includes('USD/ILS')) {
+    console.log(`Skipping currency symbol: ${rawSymbol}`);
+    return false;
+  }
+  
   // Skip internal account operations (tax shield, future tax, etc.)
-  if (rawType.includes('מגן מס') || rawType.includes('מס עתידי') || rawType.includes('מס לשלם') || rawType.includes('מס ששולם') || rawType.includes('מס תקבולים') || rawType.includes('זיכוי מס') || rawType.includes('איפוס מגן מס')) {
+  if (rawType.includes('מגן מס') || rawType.includes('מס עתידי') || rawType.includes('מס לשלם') || 
+      rawType.includes('מס ששולם') || rawType.includes('מס תקבולים') || rawType.includes('זיכוי מס') || 
+      rawType.includes('איפוס מגן מס') || rawType.includes('הפקדה')) {
+    console.log(`Skipping internal operation: ${rawType} - ${name}`);
+    return false;
+  }
+  
+  // Skip tax-related securities (מגן מס symbol 9993983)
+  if (rawSymbol === '9993983' || name.includes('מגן מס') || name.includes('מס ששולם')) {
+    console.log(`Skipping tax security: ${rawSymbol} - ${name}`);
     return false;
   }
   
