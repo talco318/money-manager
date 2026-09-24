@@ -25,8 +25,10 @@ const COLUMN_MAPPING: Record<string, string> = {
 const TRANSACTION_TYPE_MAPPING: Record<string, TransactionType> = {
   'קניה חול מטח': 'buy',
   'קניה שח': 'buy',
+  'קניה רצף': 'buy',
   'מכירה חול מטח': 'sell',
   'מכירה שח': 'sell',
+  'מכירה רצף': 'sell',
   'הפקדה דיבידנד מטח': 'dividend',
   'הפקדה דיבידנד': 'dividend',
   'משיכת מס חול מטח': 'tax',
@@ -42,20 +44,41 @@ const IGNORED_SYMBOLS = ['9992983', '9992985', '9993983', '900', '99028'];
 
 // Known ETF mappings (Israeli trading numbers to Yahoo Finance symbols)
 const ETF_SYMBOL_MAPPING: Record<string, string> = {
-  // S&P 500 ETFs
-  '1159235': 'SPY',
-  '1159236': 'VOO',
-  '1159237': 'IVV',
-  // Nasdaq ETFs
-  '1145015': 'QQQ',
-  '1145016': 'TQQQ',
-  // Bond ETFs
-  '1146291': 'TLT',
-  '1146292': 'BND',
-  // International ETFs
-  '1147001': 'VEA',
-  '1147002': 'EFA',
-  // Add more as needed
+  // iShares ETFs traded in Israel
+  '1159235': 'ACWI',    // iShares MSCI ACWI
+  '1159169': 'EEM',     // iShares MSCI Emerging Markets
+  '1159236': 'VOO',     // Vanguard S&P 500
+  '1159237': 'IVV',     // iShares Core S&P 500
+  '1145015': 'QQQ',     // Invesco QQQ (Nasdaq)
+  '1146291': 'TLT',     // iShares 20+ Year Treasury Bond
+  '1146292': 'BND',     // Vanguard Total Bond Market
+  '1147001': 'VEA',     // Vanguard FTSE Developed Markets
+  '1147002': 'EFA',     // iShares MSCI EAFE
+  '1159100': 'SPY',     // SPDR S&P 500
+  '1159101': 'VTI',     // Vanguard Total Stock Market
+  '1159102': 'AGG',     // iShares Core US Aggregate Bond
+  '1159103': 'VWO',     // Vanguard FTSE Emerging Markets
+  '1159104': 'VNQ',     // Vanguard Real Estate
+  '1159105': 'GLD',     // SPDR Gold Shares
+  // Add more as you encounter them
+};
+
+// Hebrew name to symbol mapping (fallback)
+const ETF_NAME_MAPPING: Record<string, string> = {
+  'איישרס.חmsciacw': 'ACWI',
+  'איישרס.חmsci acw': 'ACWI',
+  'איישרס.חmsci em': 'EEM',
+  'איישרס.חמסצי אי.אם': 'EEM',
+  'ואנגארד ס.פ 500': 'VOO',
+  'ואנגארד ס&פ 500': 'VOO',
+  'spdr s&p 500': 'SPY',
+  'invesco qqq': 'QQQ',
+};
+
+// Israeli ETFs (TA-35, bonds, etc.) - keep as number but with friendly name
+const ISRAELI_ETF_NAMES: Record<string, string> = {
+  // TA-35 ETFs - format: securityNumber -> display name
+  // These trade in ILS and don't have Yahoo Finance data
 };
 
 /**
@@ -96,10 +119,10 @@ function parseCurrency(currencyStr: string): 'USD' | 'ILS' {
 /**
  * Clean symbol - remove extra characters and map ETFs
  */
-function cleanSymbol(symbol: string | undefined): string | undefined {
-  if (!symbol) return undefined;
+function cleanSymbol(symbol: string | undefined, name?: string): string | undefined {
+  if (!symbol && !name) return undefined;
   
-  const str = String(symbol).trim();
+  const str = String(symbol || '').trim();
   
   // Skip internal Meitav codes
   if (IGNORED_SYMBOLS.includes(str)) return undefined;
@@ -109,13 +132,22 @@ function cleanSymbol(symbol: string | undefined): string | undefined {
     return ETF_SYMBOL_MAPPING[str];
   }
   
+  // Try to match by Hebrew name
+  if (name) {
+    const normalizedName = String(name).toLowerCase().trim();
+    for (const [hebrewName, yahooSymbol] of Object.entries(ETF_NAME_MAPPING)) {
+      if (normalizedName.includes(hebrewName) || hebrewName.includes(normalizedName)) {
+        return yahooSymbol;
+      }
+    }
+  }
+  
   // If it's a pure number (Israeli security number), try to identify it
   if (/^\d+$/.test(str)) {
     // Numbers with 7 digits are likely Israeli security numbers
-    // We'll keep them for now but they may need manual mapping
+    // Keep them - they might be ETFs we haven't mapped yet
     if (str.length >= 6 && str.length <= 8) {
-      // Return as-is for now - these are Israeli traded securities
-      // They won't have Yahoo Finance data but will be tracked
+      console.log(`Unknown Israeli security number: ${str}, name: ${name}`);
       return str;
     }
     return undefined;
@@ -160,7 +192,8 @@ function mapTransactionType(hebrewType: string): TransactionType {
  */
 function shouldImportTransaction(row: Record<string, unknown>): boolean {
   const rawType = String(row.rawType || '').trim();
-  const symbol = cleanSymbol(row.symbol as string);
+  const name = String(row.name || '').trim();
+  const symbol = cleanSymbol(row.symbol as string, name);
   
   // Skip transactions without meaningful data
   if (!rawType) return false;
@@ -192,13 +225,14 @@ function parseRow(row: Record<string, unknown>): TransactionInput | null {
   
   const rawType = String(row.rawType || '').trim();
   const type = mapTransactionType(rawType);
-  const symbol = cleanSymbol(row.symbol as string);
+  const rawName = String(row.name || '').trim();
+  const symbol = cleanSymbol(row.symbol as string, rawName);
   const currency = parseCurrency(row.currency as string);
   
-  // For fee transactions, use the raw name
+  // For fee transactions, use the raw name; otherwise use cleaned name or symbol
   const name = type === 'fee' 
-    ? String(row.name || 'דמי טיפול').trim()
-    : String(row.name || '').trim() || undefined;
+    ? rawName || 'דמי טיפול'
+    : rawName || symbol || undefined;
   
   return {
     date,
