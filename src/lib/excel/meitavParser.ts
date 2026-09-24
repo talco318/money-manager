@@ -39,12 +39,9 @@ const TRANSACTION_TYPE_MAPPING: Record<string, TransactionType> = {
   'דמי טיפול': 'fee',
 };
 
-// No symbols are ignored - import everything
-const IGNORED_SYMBOLS: string[] = [];
-
 // Known ETF mappings (Israeli trading numbers to Yahoo Finance symbols)
 const ETF_SYMBOL_MAPPING: Record<string, string> = {
-  // iShares ETFs traded in Israel
+  // iShares ETFs traded in Israel (international)
   '1159235': 'ACWI',    // iShares MSCI ACWI
   '1159169': 'EEM',     // iShares MSCI Emerging Markets
   '1159236': 'VOO',     // Vanguard S&P 500
@@ -60,7 +57,8 @@ const ETF_SYMBOL_MAPPING: Record<string, string> = {
   '1159103': 'VWO',     // Vanguard FTSE Emerging Markets
   '1159104': 'VNQ',     // Vanguard Real Estate
   '1159105': 'GLD',     // SPDR Gold Shares
-  // Add more as you encounter them
+  // Israeli stocks/ETFs - add .TA suffix for Yahoo Finance
+  // Format: Israeli security number -> Yahoo symbol with .TA
 };
 
 // Hebrew name to symbol mapping (fallback)
@@ -75,10 +73,11 @@ const ETF_NAME_MAPPING: Record<string, string> = {
   'invesco qqq': 'QQQ',
 };
 
-// Israeli ETFs (TA-35, bonds, etc.) - keep as number but with friendly name
-const ISRAELI_ETF_NAMES: Record<string, string> = {
-  // TA-35 ETFs - format: securityNumber -> display name
-  // These trade in ILS and don't have Yahoo Finance data
+// Israeli security numbers to TASE symbols (Yahoo uses .TA suffix)
+// These can be looked up at: https://www.tase.co.il/
+const ISRAELI_SECURITY_MAPPING: Record<string, string> = {
+  // Add Israeli securities here as: 'securityNumber': 'SYMBOL.TA'
+  // Example: '1082128': 'TEVA.TA',
 };
 
 /**
@@ -124,12 +123,17 @@ function cleanSymbol(symbol: string | undefined, name?: string): string | undefi
   
   const str = String(symbol || '').trim();
   
-  // Skip internal Meitav codes
-  if (IGNORED_SYMBOLS.includes(str)) return undefined;
+  // Skip empty symbols
+  if (!str) return undefined;
   
-  // Check if it's a known ETF by Israeli trading number
+  // Check if it's a known international ETF by Israeli trading number
   if (ETF_SYMBOL_MAPPING[str]) {
     return ETF_SYMBOL_MAPPING[str];
+  }
+  
+  // Check if it's a known Israeli security
+  if (ISRAELI_SECURITY_MAPPING[str]) {
+    return ISRAELI_SECURITY_MAPPING[str];
   }
   
   // Try to match by Hebrew name
@@ -142,13 +146,13 @@ function cleanSymbol(symbol: string | undefined, name?: string): string | undefi
     }
   }
   
-  // If it's a pure number (Israeli security number), try to identify it
+  // If it's a pure number (Israeli security number)
   if (/^\d+$/.test(str)) {
-    // Numbers with 7 digits are likely Israeli security numbers
-    // Keep them - they might be ETFs we haven't mapped yet
-    if (str.length >= 6 && str.length <= 8) {
-      console.log(`Unknown Israeli security number: ${str}, name: ${name}`);
-      return str;
+    // Keep as-is - it's an Israeli security we haven't mapped
+    // It will be stored and can be manually mapped later
+    if (str.length >= 5 && str.length <= 8) {
+      console.log(`Unmapped Israeli security: ${str}, name: ${name}`);
+      return str; // Keep the number as symbol
     }
     return undefined;
   }
