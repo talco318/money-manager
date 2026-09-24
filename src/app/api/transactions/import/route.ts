@@ -44,13 +44,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Get existing transaction hashes for duplicate detection
+    // Must include all fields used by createTransactionHash
     const existingTransactions = await prisma.transaction.findMany({
       select: {
         date: true,
         symbol: true,
+        name: true,
         type: true,
+        rawType: true,
         quantity: true,
         price: true,
+        totalAmountUSD: true,
+        totalAmountILS: true,
       },
     });
 
@@ -60,8 +65,12 @@ export async function POST(request: NextRequest) {
           date: t.date,
           type: t.type as TransactionInput['type'],
           symbol: t.symbol || undefined,
+          name: t.name || undefined,
+          rawType: t.rawType || undefined,
           quantity: t.quantity || undefined,
           price: t.price || undefined,
+          totalAmountUSD: t.totalAmountUSD || undefined,
+          totalAmountILS: t.totalAmountILS || undefined,
           currency: 'USD',
         })
       )
