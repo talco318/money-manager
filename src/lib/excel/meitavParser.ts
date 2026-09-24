@@ -495,13 +495,19 @@ export function parseExcelFile(buffer: ArrayBuffer): ImportResult {
 
 /**
  * Create a unique hash for duplicate detection
+ * Includes more fields for better uniqueness
  */
 export function createTransactionHash(transaction: TransactionInput): string {
   const dateStr = transaction.date.toISOString().split('T')[0];
   const symbol = transaction.symbol || 'N/A';
+  const name = transaction.name || 'N/A';
   const quantity = transaction.quantity?.toFixed(4) || '0';
   const price = transaction.price?.toFixed(4) || '0';
   const type = transaction.type;
+  const rawType = transaction.rawType || '';
+  const totalUSD = transaction.totalAmountUSD?.toFixed(2) || '0';
+  const totalILS = transaction.totalAmountILS?.toFixed(2) || '0';
   
-  return `${dateStr}_${symbol}_${type}_${quantity}_${price}`;
+  // Include more fields for better uniqueness
+  return `${dateStr}_${symbol}_${name}_${type}_${rawType}_${quantity}_${price}_${totalUSD}_${totalILS}`;
 }
