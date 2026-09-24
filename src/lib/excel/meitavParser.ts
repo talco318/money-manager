@@ -39,8 +39,8 @@ const TRANSACTION_TYPE_MAPPING: Record<string, TransactionType> = {
   'דמי טיפול': 'fee',
 };
 
-// Symbols to ignore (internal Meitav codes)
-const IGNORED_SYMBOLS = ['9992983', '9992985', '9993983', '900', '99028'];
+// No symbols are ignored - import everything
+const IGNORED_SYMBOLS: string[] = [];
 
 // Known ETF mappings (Israeli trading numbers to Yahoo Finance symbols)
 const ETF_SYMBOL_MAPPING: Record<string, string> = {
