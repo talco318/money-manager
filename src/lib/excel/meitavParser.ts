@@ -40,25 +40,20 @@ const TRANSACTION_TYPE_MAPPING: Record<string, TransactionType> = {
 };
 
 // Known ETF mappings (Israeli trading numbers to Yahoo Finance symbols)
+// NOTE: These are traded on TASE (TLV) - prices are in AGOROT!
 const ETF_SYMBOL_MAPPING: Record<string, string> = {
-  // iShares ETFs traded in Israel (international)
-  '1159235': 'ACWI',    // iShares MSCI ACWI
-  '1159169': 'EEM',     // iShares MSCI Emerging Markets
-  '1159236': 'VOO',     // Vanguard S&P 500
-  '1159237': 'IVV',     // iShares Core S&P 500
-  '1145015': 'QQQ',     // Invesco QQQ (Nasdaq)
-  '1146291': 'TLT',     // iShares 20+ Year Treasury Bond
-  '1146292': 'BND',     // Vanguard Total Bond Market
-  '1147001': 'VEA',     // Vanguard FTSE Developed Markets
-  '1147002': 'EFA',     // iShares MSCI EAFE
-  '1159100': 'SPY',     // SPDR S&P 500
-  '1159101': 'VTI',     // Vanguard Total Stock Market
-  '1159102': 'AGG',     // iShares Core US Aggregate Bond
-  '1159103': 'VWO',     // Vanguard FTSE Emerging Markets
-  '1159104': 'VNQ',     // Vanguard Real Estate
-  '1159105': 'GLD',     // SPDR Gold Shares
-  // Israeli stocks/ETFs - add .TA suffix for Yahoo Finance
-  // Format: Israeli security number -> Yahoo symbol with .TA
+  // iShares ETFs traded in Israel (from Meitav screenshots)
+  '1159169': 'EEM',     // איישרס MSCI EM (Emerging Markets)
+  '1159235': 'ACWI',    // איישרס MSCI AC (All Country World)
+  '1159250': 'VOO',     // איישרס SP500
+  '1183441': 'SPY',     // אינ.חוץ S&P500
+  
+  // Israeli ETFs - use .TA suffix for Yahoo Finance
+  '1238203': 'TA125.TA',  // סל ת"א 125 ATF
+  '1148949': 'BKIR.TA',   // הראל.אינ בנק ישר (approximate)
+  
+  // Cash/Currency
+  '99028': 'USD',       // דולר ארה"ב (USD cash position)
 };
 
 // Hebrew name to symbol mapping (fallback)
@@ -124,23 +119,53 @@ function parseCurrency(currencyStr: string): { currency: 'USD' | 'ILS', isAgorot
 }
 
 /**
+ * Check if a transaction type indicates Israeli market (TASE)
+ * Israeli transactions have prices in Agorot
+ */
+function isIsraeliTransactionType(rawType: string): boolean {
+  const type = String(rawType).trim().toLowerCase();
+  // "רצף" = Israeli continuous trading
+  // "שח" = Shekel transactions
+  // NOT "חול" (foreign) or "מטח" (foreign currency)
+  if (type.includes('רצף') || type.includes('שח')) {
+    if (!type.includes('חול') && !type.includes('מטח')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Check if a security price is in Agorot and needs conversion to ILS
  * 
  * Key insight: Securities traded on TASE (Israeli exchange) are priced in AGOROT,
  * even if they're international ETFs like ACWI or EEM.
  * 
- * The Excel shows currency as ₪ but the price is actually in Agorot (1/100 shekel)
- * Example: 34820₪ actually means 34820 Agorot = 348.20 ILS
+ * Detection methods:
+ * 1. Transaction type contains "רצף" (Israeli continuous trading)
+ * 2. Currency is ILS/₪ and price > 100 (Agorot prices are typically 1000-50000)
+ * 3. Symbol is a 6-7 digit Israeli security number
  */
-function isIsraeliSecurityInAgorot(symbol: string | undefined, price: number | undefined, currencyStr: string): boolean {
-  if (!symbol) return false;
-  const str = String(symbol).trim();
-  
+function isIsraeliSecurityInAgorot(
+  symbol: string | undefined, 
+  price: number | undefined, 
+  currencyStr: string,
+  rawType?: string
+): boolean {
   // If currency explicitly indicates Agorot
   if (currencyStr && (currencyStr.includes('אג') || currencyStr.toLowerCase().includes('agr'))) {
-    console.log(`Agorot detected by currency string for ${str}`);
+    console.log(`Agorot detected by currency string: ${symbol}`);
     return true;
   }
+  
+  // If transaction type indicates Israeli market
+  if (rawType && isIsraeliTransactionType(rawType)) {
+    console.log(`Agorot detected by transaction type "${rawType}": ${symbol}`);
+    return true;
+  }
+  
+  if (!symbol) return false;
+  const str = String(symbol).trim();
   
   // Check if currency is ILS (שח or ₪)
   const isILS = currencyStr && (
@@ -298,11 +323,11 @@ function parseRow(row: Record<string, unknown>): TransactionInput | null {
   let price = row.price ? Math.abs(Number(row.price)) : undefined;
   
   // Check if this is an Israeli security with price in Agorot
-  const needsAgorotConversion = isAgorot || isIsraeliSecurityInAgorot(rawSymbol, price, currencyStr);
+  const needsAgorotConversion = isAgorot || isIsraeliSecurityInAgorot(rawSymbol, price, currencyStr, rawType);
   
   // Convert from Agorot to Shekels if needed
   if (price && needsAgorotConversion) {
-    console.log(`Converting Agorot to ILS: ${rawSymbol} ${price} -> ${price / 100}`);
+    console.log(`Converting Agorot to ILS: ${rawSymbol} (${rawType}) ${price} -> ${price / 100}`);
     price = price / 100;
   }
   
