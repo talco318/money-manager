@@ -59,60 +59,51 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const existingHashes = new Set(
-      existingTransactions.map((t) =>
-        createTransactionHash({
-          date: t.date,
-          type: t.type as TransactionInput['type'],
-          symbol: t.symbol || undefined,
-          name: t.name || undefined,
-          rawType: t.rawType || undefined,
-          quantity: t.quantity || undefined,
-          price: t.price || undefined,
-          totalAmountUSD: t.totalAmountUSD || undefined,
-          totalAmountILS: t.totalAmountILS || undefined,
-          currency: 'USD',
-        })
-      )
-    );
+    // Count occurrences of each hash in existing transactions
+    const existingHashCounts = new Map<string, number>();
+    existingTransactions.forEach((t) => {
+      const hash = createTransactionHash({
+        date: t.date,
+        type: t.type as TransactionInput['type'],
+        symbol: t.symbol || undefined,
+        name: t.name || undefined,
+        rawType: t.rawType || undefined,
+        quantity: t.quantity || undefined,
+        price: t.price || undefined,
+        totalAmountUSD: t.totalAmountUSD || undefined,
+        totalAmountILS: t.totalAmountILS || undefined,
+        currency: 'USD',
+      });
+      existingHashCounts.set(hash, (existingHashCounts.get(hash) || 0) + 1);
+    });
 
-    // Filter out duplicates
+    // Process import - allow identical transactions within same file
+    // Only skip if that exact count already exists in DB
     const newTransactions: TransactionInput[] = [];
     let duplicates = 0;
-    const duplicateDetails: Array<{ hash: string; transaction: Partial<TransactionInput> }> = [];
+    const importHashCounts = new Map<string, number>();
 
     for (const transaction of parseResult.transactions) {
       const hash = createTransactionHash(transaction);
-      if (!existingHashes.has(hash)) {
-        newTransactions.push(transaction);
-        existingHashes.add(hash); // Prevent duplicates within the same import
-      } else {
+      const existingCount = existingHashCounts.get(hash) || 0;
+      const importedSoFar = importHashCounts.get(hash) || 0;
+      
+      // Import if: we haven't yet reached the number that already exists in DB
+      // Example: DB has 2 identical transactions, file has 3 -> import 1 more
+      // Example: DB has 0, file has 2 identical -> import both
+      // Example: DB has 2, file has 2 identical -> skip both (already imported)
+      if (importedSoFar < existingCount) {
+        // This occurrence matches one in DB, skip it
         duplicates++;
-        // Log first 10 duplicates for debugging
-        if (duplicateDetails.length < 10) {
-          duplicateDetails.push({
-            hash,
-            transaction: {
-              date: transaction.date,
-              symbol: transaction.symbol,
-              name: transaction.name,
-              type: transaction.type,
-              rawType: transaction.rawType,
-              quantity: transaction.quantity,
-              price: transaction.price,
-            }
-          });
-        }
+      } else {
+        // This is a new occurrence, import it
+        newTransactions.push(transaction);
       }
+      
+      importHashCounts.set(hash, importedSoFar + 1);
     }
 
-    // Log duplicates for debugging
-    if (duplicateDetails.length > 0) {
-      console.log(`Found ${duplicates} duplicates. First ${duplicateDetails.length} examples:`);
-      duplicateDetails.forEach((d, i) => {
-        console.log(`Duplicate ${i + 1}: ${d.hash}`, JSON.stringify(d.transaction));
-      });
-    }
+    console.log(`Import: ${parseResult.transactions.length} parsed, ${newTransactions.length} new, ${duplicates} duplicates`);
 
     // Insert new transactions
     if (newTransactions.length > 0) {
