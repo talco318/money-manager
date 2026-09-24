@@ -18,13 +18,15 @@ interface FileUploadProps {
 
 export function FileUpload({ onImportComplete }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState<{
+  const [currentFileIndex, setCurrentFileIndex] = useState(0);
+  const [uploadResults, setUploadResults] = useState<{
+    fileName: string;
     success: boolean;
     summary?: ImportSummary;
     error?: string;
-  } | null>(null);
+  }[]>([]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -42,76 +44,118 @@ export function FileUpload({ onImportComplete }: FileUploadProps) {
     e.preventDefault();
     setIsDragging(false);
     
-    const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile) {
-      validateAndSetFile(droppedFile);
-    }
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    validateAndSetFiles(droppedFiles);
   }, []);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      validateAndSetFile(selectedFile);
-    }
+    const selectedFiles = e.target.files ? Array.from(e.target.files) : [];
+    validateAndSetFiles(selectedFiles);
   }, []);
 
-  const validateAndSetFile = (file: File) => {
-    const fileName = file.name.toLowerCase();
-    if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {
-      setUploadResult({
-        success: false,
-        error: 'יש להעלות קובץ Excel (.xlsx או .xls)',
-      });
-      return;
+  const validateAndSetFiles = (newFiles: File[]) => {
+    const validFiles: File[] = [];
+    const errors: string[] = [];
+    
+    for (const file of newFiles) {
+      const fileName = file.name.toLowerCase();
+      if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+        // Check if file already added
+        if (!files.some(f => f.name === file.name && f.size === file.size)) {
+          validFiles.push(file);
+        }
+      } else {
+        errors.push(`${file.name} - יש להעלות קובץ Excel (.xlsx או .xls)`);
+      }
     }
     
-    setFile(file);
-    setUploadResult(null);
+    if (validFiles.length > 0) {
+      setFiles(prev => [...prev, ...validFiles]);
+      setUploadResults([]);
+    }
+    
+    if (errors.length > 0) {
+      setUploadResults(errors.map(err => ({
+        fileName: err.split(' - ')[0],
+        success: false,
+        error: err.split(' - ')[1],
+      })));
+    }
   };
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (files.length === 0) return;
 
     setIsUploading(true);
-    setUploadResult(null);
+    setUploadResults([]);
+    
+    const results: typeof uploadResults = [];
+    let totalImported = 0;
+    let totalDuplicates = 0;
 
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
+    for (let i = 0; i < files.length; i++) {
+      setCurrentFileIndex(i);
+      const file = files[i];
+      
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
 
-      const response = await fetch('/api/transactions/import', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        setUploadResult({
-          success: true,
-          summary: result.summary,
+        const response = await fetch('/api/transactions/import', {
+          method: 'POST',
+          body: formData,
         });
-        setFile(null);
-        onImportComplete?.(result.summary);
-      } else {
-        setUploadResult({
+
+        const result = await response.json();
+
+        if (result.success) {
+          results.push({
+            fileName: file.name,
+            success: true,
+            summary: result.summary,
+          });
+          totalImported += result.summary.imported;
+          totalDuplicates += result.summary.duplicates;
+        } else {
+          results.push({
+            fileName: file.name,
+            success: false,
+            error: result.error,
+          });
+        }
+      } catch (error) {
+        results.push({
+          fileName: file.name,
           success: false,
-          error: result.error,
+          error: 'שגיאה בהעלאת הקובץ',
         });
       }
-    } catch (error) {
-      setUploadResult({
-        success: false,
-        error: 'שגיאה בהעלאת הקובץ. נסה שוב.',
+    }
+
+    setUploadResults(results);
+    setFiles([]);
+    setIsUploading(false);
+    
+    // Notify parent with combined summary
+    if (totalImported > 0) {
+      onImportComplete?.({
+        totalRows: results.reduce((sum, r) => sum + (r.summary?.totalRows || 0), 0),
+        parsed: results.reduce((sum, r) => sum + (r.summary?.parsed || 0), 0),
+        imported: totalImported,
+        duplicates: totalDuplicates,
+        skipped: results.reduce((sum, r) => sum + (r.summary?.skipped || 0), 0),
+        errors: results.flatMap(r => r.summary?.errors || []),
       });
-    } finally {
-      setIsUploading(false);
     }
   };
 
-  const handleRemoveFile = () => {
-    setFile(null);
-    setUploadResult(null);
+  const handleRemoveFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleClearAll = () => {
+    setFiles([]);
+    setUploadResults([]);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -138,6 +182,7 @@ export function FileUpload({ onImportComplete }: FileUploadProps) {
           ref={fileInputRef}
           type="file"
           accept=".xlsx,.xls"
+          multiple
           onChange={handleFileSelect}
           className="hidden"
         />
@@ -145,111 +190,143 @@ export function FileUpload({ onImportComplete }: FileUploadProps) {
         <div className="space-y-2">
           <div className="text-4xl">📂</div>
           <p className="text-lg font-medium text-gray-700 dark:text-gray-200">
-            גרור קובץ אקסל לכאן
+            גרור קבצי אקסל לכאן
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            או לחץ לבחירת קובץ
+            או לחץ לבחירת קבצים (ניתן לבחור מספר קבצים)
           </p>
           <p className="text-xs text-gray-400 dark:text-gray-500">
-            תומך בקבצי .xlsx ו-.xls ממיטב טרייד
+            תומך בקבצי .xlsx ו-.xls ממיטב טרייד • זיהוי כפילויות אוטומטי
           </p>
         </div>
       </div>
 
-      {/* Selected File */}
-      {file && (
-        <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">📄</span>
-            <div>
-              <p className="font-medium text-gray-900 dark:text-white">{file.name}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {(file.size / 1024).toFixed(1)} KB
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRemoveFile();
-              }}
-            >
-              הסר
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleUpload();
-              }}
-              isLoading={isUploading}
-            >
-              ייבא עסקאות
+      {/* Selected Files */}
+      {files.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="font-medium text-gray-700 dark:text-gray-200">
+              {files.length} קבצים נבחרו
+            </p>
+            <Button variant="ghost" size="sm" onClick={handleClearAll}>
+              נקה הכל
             </Button>
           </div>
+          
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {files.map((file, index) => (
+              <div 
+                key={`${file.name}-${index}`}
+                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">📄</span>
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-white text-sm">{file.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {(file.size / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveFile(index);
+                  }}
+                >
+                  ✕
+                </Button>
+              </div>
+            ))}
+          </div>
+          
+          <Button
+            variant="primary"
+            className="w-full"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleUpload();
+            }}
+            isLoading={isUploading}
+          >
+            {isUploading 
+              ? `מייבא קובץ ${currentFileIndex + 1} מתוך ${files.length}...` 
+              : `ייבא ${files.length} קבצים`
+            }
+          </Button>
         </div>
       )}
 
-      {/* Upload Result */}
-      {uploadResult && (
-        <div
-          className={`p-4 rounded-lg ${
-            uploadResult.success
-              ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
-              : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
-          }`}
-        >
-          {uploadResult.success && uploadResult.summary ? (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
-                <span>✅</span>
-                <span className="font-medium">הייבוא הושלם בהצלחה!</span>
+      {/* Upload Results */}
+      {uploadResults.length > 0 && (
+        <div className="space-y-3">
+          {uploadResults.map((result, index) => (
+            <div
+              key={index}
+              className={`p-4 rounded-lg ${
+                result.success
+                  ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                  : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <span>{result.success ? '✅' : '❌'}</span>
+                <span className="font-medium text-gray-900 dark:text-white">{result.fileName}</span>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {uploadResult.summary.totalRows}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">שורות בקובץ</p>
+              
+              {result.success && result.summary ? (
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  <div>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">
+                      {result.summary.totalRows}
+                    </p>
+                    <p className="text-xs text-gray-500">שורות</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold text-green-600">
+                      {result.summary.imported}
+                    </p>
+                    <p className="text-xs text-gray-500">יובאו</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold text-yellow-600">
+                      {result.summary.duplicates}
+                    </p>
+                    <p className="text-xs text-gray-500">כפילויות</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold text-gray-500">
+                      {result.summary.skipped}
+                    </p>
+                    <p className="text-xs text-gray-500">דולגו</p>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-green-600">
-                    {uploadResult.summary.imported}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">יובאו</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-yellow-600">
-                    {uploadResult.summary.duplicates}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">כפילויות</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-gray-500">
-                    {uploadResult.summary.skipped}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">דולגו</p>
-                </div>
-              </div>
-              {uploadResult.summary.errors.length > 0 && (
-                <div className="mt-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded text-sm">
-                  <p className="font-medium text-yellow-700 dark:text-yellow-400">שגיאות:</p>
-                  <ul className="list-disc list-inside text-yellow-600 dark:text-yellow-500">
-                    {uploadResult.summary.errors.slice(0, 5).map((err, i) => (
-                      <li key={i}>{err}</li>
-                    ))}
-                  </ul>
-                </div>
+              ) : (
+                <p className="text-red-700 dark:text-red-400 text-sm">{result.error}</p>
               )}
             </div>
-          ) : (
-            <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
-              <span>❌</span>
-              <span>{uploadResult.error}</span>
+          ))}
+          
+          {/* Combined Summary */}
+          {uploadResults.filter(r => r.success).length > 1 && (
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="font-medium text-blue-800 dark:text-blue-200 mb-2">סה"כ מכל הקבצים:</p>
+              <div className="grid grid-cols-2 gap-4 text-center">
+                <div>
+                  <p className="text-2xl font-bold text-green-600">
+                    {uploadResults.reduce((sum, r) => sum + (r.summary?.imported || 0), 0)}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">עסקאות יובאו</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-yellow-600">
+                    {uploadResults.reduce((sum, r) => sum + (r.summary?.duplicates || 0), 0)}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">כפילויות זוהו</p>
+                </div>
+              </div>
             </div>
           )}
         </div>

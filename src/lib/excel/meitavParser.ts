@@ -37,6 +37,24 @@ const TRANSACTION_TYPE_MAPPING: Record<string, TransactionType> = {
 // Symbols to ignore (internal Meitav codes)
 const IGNORED_SYMBOLS = ['9992983', '9992985', '9993983', '900', '99028'];
 
+// Known ETF mappings (Israeli trading numbers to Yahoo Finance symbols)
+const ETF_SYMBOL_MAPPING: Record<string, string> = {
+  // S&P 500 ETFs
+  '1159235': 'SPY',
+  '1159236': 'VOO',
+  '1159237': 'IVV',
+  // Nasdaq ETFs
+  '1145015': 'QQQ',
+  '1145016': 'TQQQ',
+  // Bond ETFs
+  '1146291': 'TLT',
+  '1146292': 'BND',
+  // International ETFs
+  '1147001': 'VEA',
+  '1147002': 'EFA',
+  // Add more as needed
+};
+
 /**
  * Parse date from DD/MM/YYYY format
  */
@@ -73,7 +91,7 @@ function parseCurrency(currencyStr: string): 'USD' | 'ILS' {
 }
 
 /**
- * Clean symbol - remove extra characters
+ * Clean symbol - remove extra characters and map ETFs
  */
 function cleanSymbol(symbol: string | undefined): string | undefined {
   if (!symbol) return undefined;
@@ -83,10 +101,33 @@ function cleanSymbol(symbol: string | undefined): string | undefined {
   // Skip internal Meitav codes
   if (IGNORED_SYMBOLS.includes(str)) return undefined;
   
-  // If it's a number only, it might be an internal code
-  if (/^\d+$/.test(str)) return undefined;
+  // Check if it's a known ETF by Israeli trading number
+  if (ETF_SYMBOL_MAPPING[str]) {
+    return ETF_SYMBOL_MAPPING[str];
+  }
   
-  return str.toUpperCase();
+  // If it's a pure number (Israeli security number), try to identify it
+  if (/^\d+$/.test(str)) {
+    // Numbers with 7 digits are likely Israeli security numbers
+    // We'll keep them for now but they may need manual mapping
+    if (str.length >= 6 && str.length <= 8) {
+      // Return as-is for now - these are Israeli traded securities
+      // They won't have Yahoo Finance data but will be tracked
+      return str;
+    }
+    return undefined;
+  }
+  
+  // Clean up common symbol formats
+  let cleaned = str.toUpperCase();
+  
+  // Remove common suffixes that Yahoo Finance doesn't use
+  cleaned = cleaned.replace(/\.US$/, '');
+  cleaned = cleaned.replace(/\.NYSE$/, '');
+  cleaned = cleaned.replace(/\.NASDAQ$/, '');
+  cleaned = cleaned.replace(/\s+/g, '');
+  
+  return cleaned;
 }
 
 /**

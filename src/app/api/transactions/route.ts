@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     const where: Record<string, unknown> = {};
 
     if (symbol) {
-      where.symbol = symbol;
+      where.symbol = { equals: symbol.toUpperCase(), mode: 'insensitive' };
     }
 
     if (type) {
@@ -54,6 +54,14 @@ export async function GET(request: NextRequest) {
       skip: (page - 1) * limit,
       take: limit,
     });
+
+    // For symbol-specific requests, return simpler response
+    if (symbol) {
+      return NextResponse.json({
+        success: true,
+        data: transactions,
+      });
+    }
 
     // Get unique symbols for filter dropdown
     const symbols = await prisma.transaction.findMany({

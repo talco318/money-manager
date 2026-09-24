@@ -116,7 +116,7 @@ export function Dashboard() {
           )
         }
       >
-        <HoldingsTable holdings={holdings} isLoading={isLoading} />
+        <HoldingsTable holdings={holdings} isLoading={isLoading} usdIlsRate={usdIlsRate} />
       </Card>
 
       {/* Quick Actions */}

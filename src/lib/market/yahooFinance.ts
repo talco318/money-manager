@@ -5,10 +5,17 @@ const yahooFinance = new YahooFinance();
 
 export interface QuoteData {
   symbol: string;
+  name?: string;
   price: number;
   change: number;
   changePercent: number;
   previousClose: number;
+  dayHigh?: number;
+  dayLow?: number;
+  fiftyTwoWeekHigh?: number;
+  fiftyTwoWeekLow?: number;
+  marketCap?: number;
+  volume?: number;
   currency: string;
   marketState: string;
   lastUpdated: Date;
@@ -47,10 +54,17 @@ export async function getQuote(symbol: string): Promise<QuoteData | null> {
 
     const quoteData: QuoteData = {
       symbol: quote.symbol || symbol,
+      name: quote.shortName || quote.longName,
       price: quote.regularMarketPrice,
       change: quote.regularMarketChange || 0,
       changePercent: quote.regularMarketChangePercent || 0,
       previousClose: quote.regularMarketPreviousClose || quote.regularMarketPrice,
+      dayHigh: quote.regularMarketDayHigh,
+      dayLow: quote.regularMarketDayLow,
+      fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh,
+      fiftyTwoWeekLow: quote.fiftyTwoWeekLow,
+      marketCap: quote.marketCap,
+      volume: quote.regularMarketVolume,
       currency: quote.currency || 'USD',
       marketState: quote.marketState || 'CLOSED',
       lastUpdated: new Date(),

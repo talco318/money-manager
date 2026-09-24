@@ -89,8 +89,12 @@ export function usePortfolio(): UsePortfolioResult {
       
       const quotesMap = new Map<string, QuoteFromAPI>();
       if (quotesData.success && quotesData.data) {
-        for (const quote of quotesData.data) {
-          quotesMap.set(quote.symbol, quote);
+        // Handle both array and single object responses
+        const quotesArray = Array.isArray(quotesData.data) ? quotesData.data : [quotesData.data];
+        for (const quote of quotesArray) {
+          if (quote && quote.symbol) {
+            quotesMap.set(quote.symbol, quote);
+          }
         }
       }
 
@@ -160,6 +164,13 @@ export function usePortfolio(): UsePortfolioResult {
 
   useEffect(() => {
     fetchData();
+    
+    // Auto-refresh every 60 seconds
+    const interval = setInterval(() => {
+      fetchData();
+    }, 60000);
+    
+    return () => clearInterval(interval);
   }, [fetchData]);
 
   return {

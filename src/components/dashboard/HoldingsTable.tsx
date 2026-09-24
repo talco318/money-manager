@@ -5,6 +5,7 @@ import type { HoldingWithMarketData } from '@/types';
 interface HoldingsTableProps {
   holdings: HoldingWithMarketData[];
   isLoading?: boolean;
+  usdIlsRate?: number;
 }
 
 function formatCurrency(value: number, currency: string = 'USD'): string {
@@ -29,7 +30,7 @@ function formatPercent(value: number): string {
   return `${sign}${value.toFixed(2)}%`;
 }
 
-export function HoldingsTable({ holdings, isLoading }: HoldingsTableProps) {
+export function HoldingsTable({ holdings, isLoading, usdIlsRate = 3.7 }: HoldingsTableProps) {
   if (isLoading) {
     return (
       <div className="animate-pulse">
@@ -68,6 +69,7 @@ export function HoldingsTable({ holdings, isLoading }: HoldingsTableProps) {
             <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">שינוי יומי</th>
             <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">עלות ממוצעת</th>
             <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">שווי נוכחי</th>
+            <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">שווי ב-₪</th>
             <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">רווח/הפסד</th>
           </tr>
         </thead>
@@ -82,14 +84,20 @@ export function HoldingsTable({ holdings, isLoading }: HoldingsTableProps) {
                 className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
               >
                 <td className="py-4 px-4">
-                  <div className="font-medium text-gray-900 dark:text-white">
+                  <a 
+                    href={`/stock/${holding.symbol}`}
+                    className="font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                  >
                     {holding.name}
-                  </div>
+                  </a>
                 </td>
                 <td className="py-4 px-4">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                  <a 
+                    href={`/stock/${holding.symbol}`}
+                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+                  >
                     {holding.symbol}
-                  </span>
+                  </a>
                 </td>
                 <td className="py-4 px-4 text-gray-700 dark:text-gray-300">
                   {formatNumber(holding.quantity, holding.quantity % 1 === 0 ? 0 : 4)}
@@ -112,6 +120,9 @@ export function HoldingsTable({ holdings, isLoading }: HoldingsTableProps) {
                 </td>
                 <td className="py-4 px-4 font-medium text-gray-900 dark:text-white">
                   {formatCurrency(holding.currentValue || 0)}
+                </td>
+                <td className="py-4 px-4 text-gray-600 dark:text-gray-400">
+                  {formatNumber((holding.currentValue || 0) * usdIlsRate, 0)} ₪
                 </td>
                 <td className="py-4 px-4">
                   <div className={`flex flex-col ${isProfitable ? 'text-green-600' : 'text-red-600'}`}>
