@@ -25,10 +25,10 @@ interface TransactionForCalculation {
  * Returns a map of symbol -> holding data
  */
 export async function calculateHoldings(): Promise<Map<string, HoldingData>> {
-  // Fetch all buy and sell transactions, ordered by date
+  // Fetch all relevant transactions, ordered by date
   const transactions = await prisma.transaction.findMany({
     where: {
-      type: { in: ['buy', 'sell'] },
+      type: { in: ['buy', 'sell', 'split', 'capital_reduction', 'stock_dividend'] },
       symbol: { not: null },
     },
     orderBy: { date: 'asc' },
@@ -51,7 +51,7 @@ export async function calculateHoldings(): Promise<Map<string, HoldingData>> {
   const lotsMap = new Map<string, Array<{ quantity: number; price: number }>>();
 
   for (const tx of transactions) {
-    if (!tx.symbol || !tx.quantity) continue;
+    if (!tx.symbol || tx.quantity === null || tx.quantity === undefined) continue;
 
     const symbol = tx.symbol.toUpperCase();
     const quantity = Math.abs(tx.quantity);
@@ -121,6 +121,54 @@ export async function calculateHoldings(): Promise<Map<string, HoldingData>> {
       } else {
         holding.avgPrice = holding.totalCost / holding.quantity;
       }
+    } else if (tx.type === 'split' || tx.type === 'stock_dividend') {
+      // Stock split / bonus shares / dividend in shares
+      // These ADD shares with $0 cost basis
+      // The new shares are "free" so they reduce the average cost
+      lots.push({ quantity, price: 0 });
+      
+      holding.quantity += quantity;
+      // Total cost stays the same, but avg price decreases
+      holding.avgPrice = holding.quantity > 0 ? holding.totalCost / holding.quantity : 0;
+      
+      console.log(`Split/Bonus: ${symbol} added ${quantity} shares, new total: ${holding.quantity}, new avg: ${holding.avgPrice.toFixed(2)}`);
+      
+      // Update name if we have a better one
+      if (tx.name && tx.name !== symbol) {
+        holding.name = tx.name;
+      }
+    } else if (tx.type === 'capital_reduction') {
+      // Capital reduction removes shares without selling
+      // This is like a reverse split or share cancellation
+      let remainingToRemove = quantity;
+      let costBasisRemoved = 0;
+
+      while (remainingToRemove > 0 && lots.length > 0) {
+        const oldestLot = lots[0];
+        
+        if (oldestLot.quantity <= remainingToRemove) {
+          costBasisRemoved += oldestLot.quantity * oldestLot.price;
+          remainingToRemove -= oldestLot.quantity;
+          lots.shift();
+        } else {
+          costBasisRemoved += remainingToRemove * oldestLot.price;
+          oldestLot.quantity -= remainingToRemove;
+          remainingToRemove = 0;
+        }
+      }
+
+      holding.quantity -= quantity;
+      holding.totalCost -= costBasisRemoved;
+      
+      if (holding.quantity < 0.0001) {
+        holding.quantity = 0;
+        holding.totalCost = 0;
+        holding.avgPrice = 0;
+      } else {
+        holding.avgPrice = holding.totalCost / holding.quantity;
+      }
+      
+      console.log(`Capital reduction: ${symbol} removed ${quantity} shares, new total: ${holding.quantity}`);
     }
   }
 

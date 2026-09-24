@@ -6,11 +6,15 @@ export type TransactionType =
   | 'buy'
   | 'sell'
   | 'dividend'
+  | 'stock_dividend'  // Dividend paid in shares
   | 'tax'
   | 'deposit'
   | 'withdrawal'
   | 'fee'
-  | 'currency_exchange';
+  | 'currency_exchange'
+  | 'split'           // Stock split / bonus shares (adds shares at $0)
+  | 'capital_reduction' // Reduces shares
+  | 'interest';       // Interest income
 
 export interface TransactionInput {
   date: Date;

@@ -23,20 +23,55 @@ const COLUMN_MAPPING: Record<string, string> = {
 
 // Transaction type mapping from Hebrew
 const TRANSACTION_TYPE_MAPPING: Record<string, TransactionType> = {
+  // Buy transactions
   'קניה חול מטח': 'buy',
   'קניה שח': 'buy',
   'קניה רצף': 'buy',
+  'קניה מעוף': 'buy',
+  'קניה מס (( ניעז)': 'buy',  // Tax-related purchase
+  'קניה מס': 'buy',
+  
+  // Sell transactions
   'מכירה חול מטח': 'sell',
   'מכירה שח': 'sell',
   'מכירה רצף': 'sell',
+  'מכירה מעוף': 'sell',
+  
+  // Dividends
   'הפקדה דיבידנד מטח': 'dividend',
   'הפקדה דיבידנד': 'dividend',
+  'דיבדנד': 'dividend',
+  'דיבידנד בעין': 'stock_dividend',  // Dividend paid in shares
+  
+  // Tax
   'משיכת מס חול מטח': 'tax',
   'משיכת מס': 'tax',
+  
+  // Deposits/Withdrawals
   'הפקדה': 'deposit',
   'משיכה': 'withdrawal',
+  'העברה מזומן בשח': 'deposit',
+  
+  // Fees
   'דמי טפול מזומן בשח': 'fee',
   'דמי טיפול': 'fee',
+  'עמלה מזומן בשח': 'fee',
+  
+  // Stock splits / bonus shares - ADD shares at $0 cost
+  'הטבה': 'split',  // This is the main one - bonus shares / stock split
+  'פיצול מניות': 'split',
+  'פיצול': 'split',
+  'הקצאת זכויות': 'split',
+  'הקצאה': 'split',
+  'מניות הטבה': 'split',
+  'בונוס': 'split',
+  
+  // Capital reduction - REMOVE shares
+  'הפחתת הון': 'capital_reduction',
+  
+  // Interest
+  'ריבית בניע': 'interest',
+  'ריבית מזומן בשח': 'interest',
 };
 
 // Known ETF mappings (Israeli trading numbers to Yahoo Finance symbols)
@@ -285,13 +320,31 @@ function shouldImportTransaction(row: Record<string, unknown>): boolean {
   // Skip transactions without meaningful data
   if (!rawType) return false;
   
-  // Skip internal account operations (unless they have real symbols)
-  if (rawType.includes('מגן מס') || rawType.includes('מס עתידי') || rawType.includes('מס לשלם')) {
+  // Skip internal account operations (tax shield, future tax, etc.)
+  if (rawType.includes('מגן מס') || rawType.includes('מס עתידי') || rawType.includes('מס לשלם') || rawType.includes('מס ששולם') || rawType.includes('מס תקבולים') || rawType.includes('זיכוי מס') || rawType.includes('איפוס מגן מס')) {
     return false;
   }
   
-  // Skip if no symbol and it's a buy/sell
+  // Skip bank interest (פח"ק בבנק)
+  if (name.includes('פח"ק בבנק') || name.includes('פחק בבנק')) {
+    return false;
+  }
+  
+  // Skip fee labels without actual transactions
+  if (rawType.includes('דמי טיפול') && !symbol) {
+    // Only skip if it's just a fee label, not a real fee transaction
+    const quantity = Number(row.quantity || 0);
+    if (quantity === 0) return false;
+  }
+  
   const type = mapTransactionType(rawType);
+  
+  // Always import splits, capital reductions, and stock dividends if they have a symbol
+  if ((type === 'split' || type === 'capital_reduction' || type === 'stock_dividend') && symbol) {
+    return true;
+  }
+  
+  // Skip if no symbol and it's a buy/sell
   if ((type === 'buy' || type === 'sell') && !symbol) {
     return false;
   }
