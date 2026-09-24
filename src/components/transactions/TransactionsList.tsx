@@ -247,9 +247,9 @@ export function TransactionsList() {
                     <td className="py-3 px-4">
                       <div>
                         <p className="font-medium text-gray-900 dark:text-white">
-                          {tx.symbol || '-'}
+                          {tx.symbol || tx.name || '-'}
                         </p>
-                        {tx.name && tx.name !== tx.symbol && (
+                        {tx.name && tx.symbol && tx.name !== tx.symbol && (
                           <p className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
                             {tx.name}
                           </p>
