@@ -35,6 +35,27 @@ export interface HistoricalData {
 const cache = new Map<string, { data: QuoteData; timestamp: number }>();
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes in milliseconds
 
+// Israeli securities proxy mapping to Yahoo Finance symbols
+// Note: These funds trade in London/Europe in USD, and their TASE price is directly linked to them via USD/ILS rate!
+const ISRAELI_PROXY_MAPPING: Record<string, { targetSymbol: string; inUSD: boolean }> = {
+  // iShares Core S&P 500 UCITS ETF (TASE: 1159250 -> LSE: CSPX.L)
+  '1159250': { targetSymbol: 'CSPX.L', inUSD: true },
+  // iShares MSCI ACWI UCITS ETF (TASE: 1159235 -> LSE: ISAC.L)
+  '1159235': { targetSymbol: 'ISAC.L', inUSD: true },
+  // iShares Core MSCI EM IMI UCITS ETF (TASE: 1159169 -> LSE: EIMI.L)
+  '1159169': { targetSymbol: 'EIMI.L', inUSD: true },
+  // Invesco S&P 500 UCITS ETF (TASE: 1183441 -> LSE: SPXS.L)
+  '1183441': { targetSymbol: 'SPXS.L', inUSD: true },
+};
+
+// Fallback market prices for Israeli securities without Yahoo Finance listing
+const ISRAELI_FALLBACK_PRICES: Record<string, { price: number; name?: string }> = {
+  // ATF סל ת"א 125
+  '1238203': { price: 48.92, name: 'ATF סל ת"א 125' },
+  // הרל.אינ בנק ישר
+  '1148949': { price: 78.33, name: 'הרל.אינ בנק ישר' },
+};
+
 /**
  * Get real-time quote for a single symbol
  */
@@ -46,26 +67,64 @@ export async function getQuote(symbol: string): Promise<QuoteData | null> {
       return cached.data;
     }
 
-    const quote = await yahooFinance.quote(symbol);
+    const proxy = ISRAELI_PROXY_MAPPING[symbol];
+    const fetchSymbol = proxy ? proxy.targetSymbol : symbol;
+
+    let quote = null;
+    try {
+      quote = await yahooFinance.quote(fetchSymbol);
+    } catch {
+      // Fallback below
+    }
     
     if (!quote || !quote.regularMarketPrice) {
+      const fallback = ISRAELI_FALLBACK_PRICES[symbol];
+      if (fallback) {
+        const quoteData: QuoteData = {
+          symbol,
+          name: fallback.name,
+          price: fallback.price,
+          change: 0,
+          changePercent: 0,
+          previousClose: fallback.price,
+          currency: 'ILS',
+          marketState: 'CLOSED',
+          lastUpdated: new Date(),
+        };
+        cache.set(symbol, { data: quoteData, timestamp: Date.now() });
+        return quoteData;
+      }
       return null;
     }
 
+    let price = quote.regularMarketPrice;
+    let change = quote.regularMarketChange || 0;
+    let previousClose = quote.regularMarketPreviousClose || price;
+    let currency = quote.currency || 'USD';
+
+    // If this is an Israeli fund mapped to an international USD UCITS ETF, convert to ILS
+    if (proxy && proxy.inUSD) {
+      const rate = await getUsdIlsRate();
+      price = Number((price * rate).toFixed(2));
+      change = Number((change * rate).toFixed(2));
+      previousClose = Number((previousClose * rate).toFixed(2));
+      currency = 'ILS';
+    }
+
     const quoteData: QuoteData = {
-      symbol: quote.symbol || symbol,
+      symbol: symbol, // Return the requested symbol
       name: quote.shortName || quote.longName,
-      price: quote.regularMarketPrice,
-      change: quote.regularMarketChange || 0,
+      price,
+      change,
       changePercent: quote.regularMarketChangePercent || 0,
-      previousClose: quote.regularMarketPreviousClose || quote.regularMarketPrice,
-      dayHigh: quote.regularMarketDayHigh,
-      dayLow: quote.regularMarketDayLow,
+      previousClose,
+      dayHigh: quote.regularMarketDayHigh ? (proxy?.inUSD ? Number((quote.regularMarketDayHigh * (await getUsdIlsRate())).toFixed(2)) : quote.regularMarketDayHigh) : undefined,
+      dayLow: quote.regularMarketDayLow ? (proxy?.inUSD ? Number((quote.regularMarketDayLow * (await getUsdIlsRate())).toFixed(2)) : quote.regularMarketDayLow) : undefined,
       fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh,
       fiftyTwoWeekLow: quote.fiftyTwoWeekLow,
       marketCap: quote.marketCap,
       volume: quote.regularMarketVolume,
-      currency: quote.currency || 'USD',
+      currency,
       marketState: quote.marketState || 'CLOSED',
       lastUpdated: new Date(),
     };
@@ -196,7 +255,11 @@ export async function getHistoricalData(
         break;
     }
 
-    const historical = await yahooFinance.historical(symbol, {
+    const proxy = ISRAELI_PROXY_MAPPING[symbol];
+    const fetchSymbol = proxy ? proxy.targetSymbol : symbol;
+    const rate = (proxy && proxy.inUSD) ? await getUsdIlsRate() : 1;
+
+    const historical = await yahooFinance.historical(fetchSymbol, {
       period1: startDate,
       period2: endDate,
       interval: '1d',
@@ -204,12 +267,12 @@ export async function getHistoricalData(
 
     return historical.map((item) => ({
       date: item.date,
-      open: item.open || 0,
-      high: item.high || 0,
-      low: item.low || 0,
-      close: item.close || 0,
+      open: (item.open || 0) * rate,
+      high: (item.high || 0) * rate,
+      low: (item.low || 0) * rate,
+      close: (item.close || 0) * rate,
       volume: item.volume || 0,
-      adjClose: item.adjClose || item.close || 0,
+      adjClose: (item.adjClose || item.close || 0) * rate,
     }));
   } catch (error) {
     console.error(`Error fetching historical data for ${symbol}:`, error);
