@@ -6,6 +6,11 @@ interface HoldingsTableProps {
   holdings: HoldingWithMarketData[];
   isLoading?: boolean;
   usdIlsRate?: number;
+  cashBalances?: {
+    ils: number;
+    usd: number;
+    totalILS: number;
+  };
 }
 
 function formatCurrency(value: number, currency: string = 'USD'): string {
@@ -30,7 +35,7 @@ function formatPercent(value: number): string {
   return `${sign}${value.toFixed(2)}%`;
 }
 
-export function HoldingsTable({ holdings, isLoading, usdIlsRate = 3.7 }: HoldingsTableProps) {
+export function HoldingsTable({ holdings, isLoading, usdIlsRate = 3.7, cashBalances }: HoldingsTableProps) {
   if (isLoading) {
     return (
       <div className="animate-pulse">
@@ -161,7 +166,102 @@ export function HoldingsTable({ holdings, isLoading, usdIlsRate = 3.7 }: Holding
               </tr>
             );
           })}
+
+          {/* USD Cash Position (matching Meitav Trade's נייר 99028 דולר ארה"ב) */}
+          {cashBalances && cashBalances.usd > 0 && (
+            <tr className="border-b border-gray-100 dark:border-gray-800 bg-blue-50/20 dark:bg-blue-900/10">
+              <td className="py-4 px-4 font-medium text-gray-900 dark:text-white">
+                <div className="flex items-center gap-2">
+                  <span>🇺🇸</span>
+                  <span>דולר ארה"ב (מזומן)</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium">
+                    מזומן מט"ח
+                  </span>
+                </div>
+              </td>
+              <td className="py-4 px-4">
+                <span className="font-mono text-gray-600 dark:text-gray-400">99028</span>
+              </td>
+              <td className="py-4 px-4 text-gray-700 dark:text-gray-300">
+                {formatNumber(cashBalances.usd, 2)}
+              </td>
+              <td className="py-4 px-4 text-gray-700 dark:text-gray-300">
+                {formatCurrency(1, 'USD')}
+              </td>
+              <td className="py-4 px-4 text-gray-400 dark:text-gray-500 text-xs">
+                —
+              </td>
+              <td className="py-4 px-4 text-gray-700 dark:text-gray-300">
+                {formatCurrency(1, 'USD')}
+              </td>
+              <td className="py-4 px-4 font-medium text-gray-900 dark:text-white">
+                {formatCurrency(cashBalances.usd, 'USD')}
+              </td>
+              <td className="py-4 px-4 font-semibold text-blue-600 dark:text-blue-400">
+                {formatNumber(cashBalances.usd * usdIlsRate, 0)} ₪
+              </td>
+              <td className="py-4 px-4 text-gray-400 dark:text-gray-500 text-xs">
+                —
+              </td>
+            </tr>
+          )}
+
+          {/* ILS Cash Position (matching Meitav Trade's יתרה שקלית) */}
+          {cashBalances && cashBalances.ils > 0 && (
+            <tr className="border-b border-gray-100 dark:border-gray-800 bg-green-50/20 dark:bg-green-900/10">
+              <td className="py-4 px-4 font-medium text-gray-900 dark:text-white">
+                <div className="flex items-center gap-2">
+                  <span>🇮🇱</span>
+                  <span>מזומן שקלי (עו"ש)</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 font-medium">
+                    יתרה שקלית
+                  </span>
+                </div>
+              </td>
+              <td className="py-4 px-4">
+                <span className="font-mono text-gray-600 dark:text-gray-400">ILS</span>
+              </td>
+              <td className="py-4 px-4 text-gray-700 dark:text-gray-300">
+                {formatNumber(cashBalances.ils, 2)}
+              </td>
+              <td className="py-4 px-4 text-gray-700 dark:text-gray-300">
+                {formatCurrency(1, 'ILS')}
+              </td>
+              <td className="py-4 px-4 text-gray-400 dark:text-gray-500 text-xs">
+                —
+              </td>
+              <td className="py-4 px-4 text-gray-700 dark:text-gray-300">
+                {formatCurrency(1, 'ILS')}
+              </td>
+              <td className="py-4 px-4 font-medium text-gray-900 dark:text-white">
+                {formatCurrency(cashBalances.ils, 'ILS')}
+              </td>
+              <td className="py-4 px-4 font-semibold text-green-600 dark:text-green-400">
+                {formatNumber(cashBalances.ils, 0)} ₪
+              </td>
+              <td className="py-4 px-4 text-gray-400 dark:text-gray-500 text-xs">
+                —
+              </td>
+            </tr>
+          )}
         </tbody>
+
+        {cashBalances && (
+          <tfoot>
+            <tr className="border-t-2 border-gray-200 dark:border-gray-700 font-bold bg-gray-50 dark:bg-gray-800/50">
+              <td colSpan={7} className="py-3 px-4 text-right text-gray-900 dark:text-white">
+                סה"כ שווי התיק (כולל יתרות מזומן שקליות ודולריות):
+              </td>
+              <td className="py-3 px-4 text-blue-600 dark:text-blue-400 text-base font-extrabold">
+                {formatNumber(
+                  holdings.reduce((sum, h) => sum + (h.currentValueILS || 0), 0) + (cashBalances.totalILS || 0),
+                  0
+                )} ₪
+              </td>
+              <td className="py-3 px-4"></td>
+            </tr>
+          </tfoot>
+        )}
       </table>
     </div>
   );

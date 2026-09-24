@@ -93,6 +93,8 @@ export interface PortfolioSummary {
   dayChangePercent: number;
   cashBalance: number;
   cashBalanceILS: number;
+  cashBalanceUSD: number;
+  totalCashILS: number;
   holdings: HoldingWithMarketData[];
 }
 

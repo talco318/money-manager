@@ -287,57 +287,57 @@ function mapTransactionType(hebrewType: string): TransactionType {
   return 'deposit';
 }
 
+function isCurrencyExchangeRow(rawType: string, name: string, rawSymbol: string): boolean {
+  if (rawType.includes('דיבידנד') || rawType.includes('מס')) {
+    return false;
+  }
+  return (
+    rawSymbol === '99028' ||
+    name.includes('USD/ILS') ||
+    name.startsWith('B USD/ILS') ||
+    name.startsWith('S USD/ILS') ||
+    rawType.includes('USD/ILS') ||
+    rawType.includes('המרה')
+  );
+}
+
 /**
  * Check if transaction should be imported (filter out internal transactions)
  */
 function shouldImportTransaction(row: Record<string, unknown>): boolean {
   const rawType = String(row.rawType || '').trim();
   const name = String(row.name || '').trim();
-  const symbol = cleanSymbol(row.symbol as string, name);
   const rawSymbol = String(row.symbol || '').trim();
   
   // Skip transactions without meaningful data
   if (!rawType) return false;
-  
-  // Skip currency exchange transactions (B USD/ILS, USD/ILS, מט"ח)
-  if (rawType.includes('USD/ILS') || rawType.includes('מט"ח') || rawType.includes('המרה') ||
-      name.includes('USD/ILS') || name.includes('מט"ח')) {
-    console.log(`Skipping currency exchange: ${rawType} - ${name}`);
-    return false;
+
+  // Currency exchange transactions (B USD/ILS, 99028)
+  if (isCurrencyExchangeRow(rawType, name, rawSymbol)) {
+    return true;
   }
-  
-  // Skip if symbol is USD or currency-related
-  if (rawSymbol === 'USD' || rawSymbol === 'ILS' || rawSymbol.includes('USD/ILS')) {
-    console.log(`Skipping currency symbol: ${rawSymbol}`);
-    return false;
-  }
-  
-  // Skip internal account operations (tax shield, future tax, etc.)
+
+  // Skip internal tax operations (tax shield, future tax, etc.)
   if (rawType.includes('מגן מס') || rawType.includes('מס עתידי') || rawType.includes('מס לשלם') || 
       rawType.includes('מס ששולם') || rawType.includes('מס תקבולים') || rawType.includes('זיכוי מס') || 
-      rawType.includes('איפוס מגן מס') || rawType.includes('הפקדה')) {
-    console.log(`Skipping internal operation: ${rawType} - ${name}`);
+      rawType.includes('איפוס מגן מס') || rawSymbol === '9993983' || rawSymbol === '9992983' ||
+      name.includes('מגן מס') || name.includes('מס ששולם')) {
     return false;
   }
-  
-  // Skip tax-related securities (מגן מס symbol 9993983)
-  if (rawSymbol === '9993983' || name.includes('מגן מס') || name.includes('מס ששולם')) {
-    console.log(`Skipping tax security: ${rawSymbol} - ${name}`);
-    return false;
-  }
-  
-  // Skip bank interest (פח"ק בבנק)
+
+  // Skip bank deposit interest (פח"ק בבנק)
   if (name.includes('פח"ק בבנק') || name.includes('פחק בבנק')) {
     return false;
   }
-  
-  // Skip fee labels without actual transactions
-  if (rawType.includes('דמי טיפול') && !symbol) {
-    // Only skip if it's just a fee label, not a real fee transaction
-    const quantity = Number(row.quantity || 0);
-    if (quantity === 0) return false;
+
+  // Real cash movements (deposits, fees, interest)
+  if (rawType.includes('העברה מזומן') || rawType.includes('משיכת מזומן') || 
+      rawType.includes('דמי טיפול') || rawType.includes('דמי טפול') || 
+      rawType.includes('ריבית מזומן') || rawType === 'הפקדה' || rawType === 'משיכה') {
+    return true;
   }
-  
+
+  const symbol = cleanSymbol(rawSymbol, name);
   const type = mapTransactionType(rawType);
   
   // Always import splits, capital reductions, and stock dividends if they have a symbol
@@ -365,9 +365,40 @@ function parseRow(row: Record<string, unknown>): TransactionInput | null {
   if (!date) return null;
   
   const rawType = String(row.rawType || '').trim();
-  const type = mapTransactionType(rawType);
   const rawName = String(row.name || '').trim();
   const rawSymbol = String(row.symbol || '').trim();
+
+  // Handle currency exchange explicitly
+  if (isCurrencyExchangeRow(rawType, rawName, rawSymbol)) {
+    const qty = row.quantity ? Math.abs(Number(row.quantity)) : 0;
+    let price = row.price ? Math.abs(Number(row.price)) : undefined;
+    if (price && price > 100) {
+      price = price / 100;
+    }
+    const isBuyUSD = rawType.includes('קניה') || rawName.startsWith('B USD/ILS');
+    const isSellUSD = rawType.includes('מכירה') || rawName.startsWith('S USD/ILS');
+    const totalAmountUSD = isBuyUSD ? qty : (isSellUSD ? -qty : (row.totalAmountUSD ? Number(row.totalAmountUSD) : 0));
+
+    return {
+      date,
+      type: 'currency_exchange',
+      symbol: 'USD',
+      name: rawName || 'המרת מט"ח דולר/שקל',
+      quantity: qty,
+      price,
+      currency: 'USD',
+      commission: row.commission ? Math.abs(Number(row.commission)) : 0,
+      additionalFees: row.additionalFees ? Math.abs(Number(row.additionalFees)) : 0,
+      totalAmountUSD,
+      totalAmountILS: row.totalAmountILS ? Number(row.totalAmountILS) : undefined,
+      cashBalance: row.cashBalance ? Number(row.cashBalance) : undefined,
+      taxEstimate: row.taxEstimate ? Number(row.taxEstimate) : undefined,
+      broker: 'Meitav',
+      rawType,
+    };
+  }
+
+  const type = mapTransactionType(rawType);
   const symbol = cleanSymbol(rawSymbol, rawName);
   
   const currencyStr = String(row.currency || '').trim();

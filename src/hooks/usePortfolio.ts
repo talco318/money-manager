@@ -56,31 +56,36 @@ export function usePortfolio(): UsePortfolioResult {
 
       const dbHoldings: HoldingFromAPI[] = holdingsData.data.holdings || [];
 
+      // Fetch USD/ILS rate
+      const rateRes = await fetch('/api/market?type=usdils');
+      const rateData = await rateRes.json();
+      const rate = rateData.success ? rateData.data.rate : 3.7;
+      setUsdIlsRate(rate);
+
       if (dbHoldings.length === 0) {
         // No holdings, set empty state
         setHoldings([]);
+        const emptyCashILS = holdingsData.data.cashBalance?.ils || 0;
+        const emptyCashUSD = holdingsData.data.cashBalance?.usd || 0;
+        const emptyTotalCashILS = emptyCashILS + (emptyCashUSD * rate);
         setSummary({
-          totalValue: 0,
-          totalValueILS: 0,
+          totalValue: rate > 0 ? emptyTotalCashILS / rate : 0,
+          totalValueILS: emptyTotalCashILS,
           totalCost: 0,
           totalPnL: 0,
           totalPnLPercent: 0,
           dayChange: 0,
           dayChangePercent: 0,
-          cashBalance: holdingsData.data.cashBalance?.ils || 0,
-          cashBalanceILS: holdingsData.data.cashBalance?.ils || 0,
+          cashBalance: emptyTotalCashILS,
+          cashBalanceILS: emptyCashILS,
+          cashBalanceUSD: emptyCashUSD,
+          totalCashILS: emptyTotalCashILS,
           holdings: [],
         });
         setIsLoading(false);
         setLastUpdated(new Date());
         return;
       }
-
-      // Fetch USD/ILS rate
-      const rateRes = await fetch('/api/market?type=usdils');
-      const rateData = await rateRes.json();
-      const rate = rateData.success ? rateData.data.rate : 3.7;
-      setUsdIlsRate(rate);
 
       // Fetch market quotes for all symbols
       const symbols = dbHoldings.map(h => h.symbol).join(',');
@@ -197,8 +202,10 @@ export function usePortfolio(): UsePortfolioResult {
         totalPnLPercent,
         dayChange: totalDayChangeUSD,
         dayChangePercent,
-        cashBalance: cashILS,
-        cashBalanceILS: totalCashILS,
+        cashBalance: totalCashILS,
+        cashBalanceILS: cashILS,
+        cashBalanceUSD: cashUSD,
+        totalCashILS,
         holdings: enrichedHoldings,
       });
       setLastUpdated(new Date());

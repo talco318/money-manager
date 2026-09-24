@@ -75,7 +75,20 @@ export async function calculateHoldings(): Promise<Map<string, HoldingData>> {
   const lotsMap = new Map<string, Array<{ quantity: number; price: number }>>();
 
   for (const tx of transactions) {
-    if (!tx.symbol || tx.quantity === null || tx.quantity === undefined) continue;
+    if (
+      !tx.symbol || 
+      tx.quantity === null || 
+      tx.quantity === undefined ||
+      tx.type === 'currency_exchange' ||
+      tx.type === 'deposit' ||
+      tx.type === 'withdrawal' ||
+      tx.type === 'dividend' ||
+      tx.type === 'tax' ||
+      tx.type === 'fee' ||
+      tx.symbol.toUpperCase() === 'USD' ||
+      tx.symbol.toUpperCase() === 'ILS' ||
+      tx.symbol === '99028'
+    ) continue;
 
     const symbol = tx.symbol.toUpperCase();
     const quantity = Math.abs(tx.quantity);
@@ -344,23 +357,29 @@ export async function syncHoldings(): Promise<void> {
  * Get current cash balance from transactions
  */
 export async function calculateCashBalance(): Promise<{ usd: number; ils: number }> {
-  // Get the latest transaction with cash balance
+  // Get the latest transaction with cash balance (from Meitav's "יתרה שקלית" column)
   const latestWithBalance = await prisma.transaction.findFirst({
     where: {
       cashBalance: { not: null },
     },
-    orderBy: { date: 'desc' },
+    orderBy: [
+      { date: 'desc' },
+      { createdAt: 'desc' },
+    ],
     select: { cashBalance: true },
   });
 
-  // Sum up USD transactions
+  // Sum up USD transactions (foreign stock trades, foreign dividends, dividend taxes, currency exchanges)
   const usdTransactions = await prisma.transaction.aggregate({
     _sum: { totalAmountUSD: true },
   });
 
+  const rawUSD = usdTransactions._sum.totalAmountUSD || 0;
+  const rawILS = latestWithBalance?.cashBalance || 0;
+
   return {
-    usd: Math.max(0, usdTransactions._sum.totalAmountUSD || 0),
-    ils: latestWithBalance?.cashBalance || 0,
+    usd: Math.max(0, Number(rawUSD.toFixed(2))),
+    ils: Number(rawILS.toFixed(2)),
   };
 }
 
