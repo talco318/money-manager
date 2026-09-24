@@ -1,0 +1,117 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// Transaction - כל העסקאות מהברוקר
+// ============================================
+model Transaction {
+  id              String   @id @default(cuid())
+  date            DateTime
+  type            String   // buy, sell, dividend, tax, deposit, withdrawal, fee, currency_exchange
+  symbol          String?  // null for non-stock transactions
+  name            String?
+  quantity        Float?
+  price           Float?
+  currency        String   @default("USD") // USD, ILS
+  commission      Float    @default(0)
+  additionalFees  Float    @default(0)
+  totalAmountUSD  Float?
+  totalAmountILS  Float?
+  cashBalance     Float?
+  taxEstimate     Float?
+  broker          String   @default("Meitav")
+  rawType         String?  // Original Hebrew type from import
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([date])
+  @@index([symbol])
+  @@index([type])
+}
+
+// ============================================
+// Holding - אחזקות נוכחיות (מחושב מעסקאות)
+// ============================================
+model Holding {
+  id        String   @id @default(cuid())
+  symbol    String   @unique
+  name      String
+  quantity  Float
+  avgPrice  Float
+  currency  String   @default("USD")
+  totalCost Float
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// Dividend - דיבידנדים שהתקבלו
+// ============================================
+model Dividend {
+  id          String   @id @default(cuid())
+  date        DateTime
+  symbol      String
+  name        String?
+  amount      Float
+  taxWithheld Float    @default(0)
+  currency    String   @default("USD")
+  createdAt   DateTime @default(now())
+
+  @@index([date])
+  @@index([symbol])
+}
+
+// ============================================
+// Alert - התראות על מחירים
+// ============================================
+model Alert {
+  id            String    @id @default(cuid())
+  symbol        String
+  name          String?
+  type          String    // price_above, price_below, percent_change, pnl_target
+  targetPrice   Float?
+  percentChange Float?
+  isActive      Boolean   @default(true)
+  triggeredAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([symbol])
+  @@index([isActive])
+}
+
+// ============================================
+// PortfolioSnapshot - תמונת מצב יומית של התיק
+// ============================================
+model PortfolioSnapshot {
+  id          String   @id @default(cuid())
+  date        DateTime @unique
+  totalValue  Float
+  cashBalance Float
+  sp500Value  Float?
+  totalPnL    Float
+  createdAt   DateTime @default(now())
+
+  @@index([date])
+}
+
+// ============================================
+// Settings - הגדרות המערכת
+// ============================================
+model Settings {
+  id                  String   @id @default("default")
+  defaultBroker       String   @default("Meitav")
+  currencyDisplay     String   @default("USD") // USD, ILS, both
+  refreshInterval     Int      @default(15) // minutes
+  notificationsEnabled Boolean @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
