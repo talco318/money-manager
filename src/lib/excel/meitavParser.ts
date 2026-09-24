@@ -407,6 +407,17 @@ function parseRow(row: Record<string, unknown>): TransactionInput | null {
     price = price / 100;
   }
   
+  // Convert ILS prices to USD for consistent portfolio calculations
+  // Use a default exchange rate (will be overwritten by real-time rates in display)
+  const DEFAULT_USD_ILS_RATE = 3.6;
+  const finalCurrency = needsAgorotConversion ? 'ILS' : currency;
+  
+  if (price && finalCurrency === 'ILS') {
+    const priceInUSD = price / DEFAULT_USD_ILS_RATE;
+    console.log(`Converting ILS to USD: ${rawSymbol} ${price} ILS -> ${priceInUSD.toFixed(2)} USD`);
+    price = priceInUSD;
+  }
+  
   // For fee transactions, use the raw name; otherwise use cleaned name or symbol
   const name = type === 'fee' 
     ? rawName || 'דמי טיפול'
@@ -419,7 +430,7 @@ function parseRow(row: Record<string, unknown>): TransactionInput | null {
     name,
     quantity: row.quantity ? Math.abs(Number(row.quantity)) : undefined,
     price,
-    currency: needsAgorotConversion ? 'ILS' : currency,
+    currency: 'USD', // Always store in USD for consistent calculations
     commission: row.commission ? Math.abs(Number(row.commission)) : 0,
     additionalFees: row.additionalFees ? Math.abs(Number(row.additionalFees)) : 0,
     totalAmountUSD: row.totalAmountUSD ? Number(row.totalAmountUSD) : undefined,
