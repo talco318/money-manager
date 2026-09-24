@@ -23,6 +23,7 @@ interface Holding {
   quantity: number;
   avgPrice: number;
   totalCost: number;
+  currency?: string;
 }
 
 interface MarketQuote {
@@ -35,6 +36,7 @@ interface MarketQuote {
   fiftyTwoWeekHigh: number;
   fiftyTwoWeekLow: number;
   marketCap: number;
+  currency?: string;
 }
 
 interface StockData {
@@ -57,7 +59,7 @@ const typeColors: Record<string, string> = {
 
 function formatCurrency(value: number | null, currency = 'USD'): string {
   if (value === null || value === undefined) return '-';
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat(currency === 'ILS' ? 'he-IL' : 'en-US', {
     style: 'currency',
     currency,
   }).format(value);
@@ -108,7 +110,7 @@ export default function StockPage() {
         const holdingsData = await holdingsRes.json();
         
         const holding = holdingsData.data?.holdings?.find(
-          (h: Holding) => h.symbol === symbol.toUpperCase()
+          (h: Holding) => h.symbol.toUpperCase() === symbol.toUpperCase()
         ) || null;
 
         // Fetch market quote
@@ -164,6 +166,7 @@ export default function StockPage() {
   }
 
   const { holding, transactions, quote } = data || { holding: null, transactions: [], quote: null };
+  const holdingCurrency = holding?.currency || (quote?.currency === 'ILS' ? 'ILS' : 'USD');
   
   // Calculate stats
   const buyTxs = transactions.filter(t => t.type === 'buy');
@@ -192,7 +195,7 @@ export default function StockPage() {
                 {symbol.toUpperCase()}
               </h1>
               <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full text-sm font-medium">
-                {holding?.quantity ? `${formatNumber(holding.quantity, 0)} יחידות` : 'אין אחזקה'}
+                {holding?.quantity ? `${formatNumber(holding.quantity, holding.quantity % 1 === 0 ? 0 : 4)} יחידות` : 'אין אחזקה'}
               </span>
             </div>
             <p className="text-gray-500 dark:text-gray-400 mt-1">
@@ -205,32 +208,45 @@ export default function StockPage() {
         </div>
 
         {/* Current Price & Value */}
-        {quote && (
+        {(quote || holding) && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card className="!p-4">
-              <p className="text-sm text-gray-500 dark:text-gray-400">מחיר נוכחי</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {formatCurrency(quote.price)}
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-500 dark:text-gray-400">מחיר נוכחי</p>
+                {quote ? (
+                  <span className="text-[11px] text-green-700 bg-green-50 px-1.5 py-0.5 rounded border border-green-200">ציטוט חי</span>
+                ) : (
+                  <span className="text-[11px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">מחיר מעסקה</span>
+                )}
+              </div>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+                {formatCurrency(currentPrice, holdingCurrency)}
               </p>
-              <p className={`text-sm ${quote.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {quote.change >= 0 ? '+' : ''}{formatCurrency(quote.change)} ({formatPercent(quote.changePercent)})
-              </p>
+              {quote ? (
+                <p className={`text-sm ${quote.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {quote.change >= 0 ? '+' : ''}{formatCurrency(quote.change, holdingCurrency)} ({formatPercent(quote.changePercent)})
+                </p>
+              ) : (
+                <p className="text-sm text-gray-400">ללא ציטוט חי</p>
+              )}
             </Card>
             
             <Card className="!p-4">
               <p className="text-sm text-gray-500 dark:text-gray-400">שווי אחזקה</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {formatCurrency(currentValue)}
+              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+                {formatCurrency(currentValue, holdingCurrency)}
               </p>
               <p className="text-sm text-gray-500">
-                {formatNumber(currentValue * usdIlsRate, 0)} ₪
+                {holdingCurrency === 'USD' 
+                  ? `${formatNumber(currentValue * usdIlsRate, 0)} ₪`
+                  : `${formatCurrency(currentValue / usdIlsRate, 'USD')}`}
               </p>
             </Card>
             
             <Card className="!p-4">
               <p className="text-sm text-gray-500 dark:text-gray-400">רווח/הפסד</p>
-              <p className={`text-2xl font-bold ${pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
+              <p className={`text-2xl font-bold mt-1 ${pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {pnl >= 0 ? '+' : ''}{formatCurrency(pnl, holdingCurrency)}
               </p>
               <p className={`text-sm ${pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {formatPercent(pnlPercent)}
@@ -239,10 +255,10 @@ export default function StockPage() {
             
             <Card className="!p-4">
               <p className="text-sm text-gray-500 dark:text-gray-400">מחיר ממוצע</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {formatCurrency(holding?.avgPrice || 0)}
+              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+                {formatCurrency(holding?.avgPrice || 0, holdingCurrency)}
               </p>
-              <p className="text-sm text-gray-500">עלות כוללת: {formatCurrency(totalCost)}</p>
+              <p className="text-sm text-gray-500">עלות כוללת: {formatCurrency(totalCost, holdingCurrency)}</p>
             </Card>
           </div>
         )}

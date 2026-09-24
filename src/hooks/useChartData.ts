@@ -81,17 +81,24 @@ export function useChartData(): UseChartDataResult {
           }
         }
 
-        // Calculate allocation data
-        let totalValue = 0;
-        const allocations = holdings.map((h: { symbol: string; name: string; quantity: number; avgPrice: number }) => {
+        // Fetch USD/ILS rate for proper multi-currency allocation
+        const rateRes = await fetch('/api/market?type=usdils');
+        const rateData = await rateRes.json();
+        const rate = rateData.success ? rateData.data.rate : 3.7;
+
+        // Calculate allocation data in consistent currency (ILS)
+        let totalValueILS = 0;
+        const allocations = holdings.map((h: { symbol: string; name: string; quantity: number; avgPrice: number; currency?: string }) => {
           const currentPrice = quotesMap.get(h.symbol) || h.avgPrice;
-          const currentValue = h.quantity * currentPrice;
-          totalValue += currentValue;
+          const isUSD = (h.currency || '').toUpperCase() === 'USD';
+          const valueNative = h.quantity * currentPrice;
+          const valueILS = isUSD ? valueNative * rate : valueNative;
+          totalValueILS += valueILS;
           return {
             symbol: h.symbol,
             name: h.name,
             quantity: h.quantity,
-            currentValue,
+            currentValue: valueILS,
             percentage: 0,
             color: '',
           };
@@ -100,7 +107,7 @@ export function useChartData(): UseChartDataResult {
         // Calculate percentages and assign colors
         const allocationWithPercent = allocations.map((a: HoldingForChart, i: number) => ({
           ...a,
-          percentage: totalValue > 0 ? (a.currentValue / totalValue) * 100 : 0,
+          percentage: totalValueILS > 0 ? (a.currentValue / totalValueILS) * 100 : 0,
           color: COLORS[i % COLORS.length],
         }));
 

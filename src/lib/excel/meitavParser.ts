@@ -74,40 +74,18 @@ const TRANSACTION_TYPE_MAPPING: Record<string, TransactionType> = {
   'ריבית מזומן בשח': 'interest',
 };
 
-// Known ETF mappings (Israeli trading numbers to Yahoo Finance symbols)
-// NOTE: These are traded on TASE (TLV) - prices are in AGOROT!
+// Known ETF mappings (Only for actual ticker renames, never map Israeli funds to US tickers)
 const ETF_SYMBOL_MAPPING: Record<string, string> = {
-  // iShares ETFs traded in Israel (from Meitav screenshots)
-  '1159169': 'EEM',     // איישרס MSCI EM (Emerging Markets)
-  '1159235': 'ACWI',    // איישרס MSCI AC (All Country World)
-  '1159250': 'VOO',     // איישרס SP500
-  '1183441': 'SPY',     // אינ.חוץ S&P500
-  
-  // Israeli ETFs - use .TA suffix for Yahoo Finance
-  '1238203': 'TA125.TA',  // סל ת"א 125 ATF
-  '1148949': 'BKIR.TA',   // הראל.אינ בנק ישר (approximate)
-  
   // Cash/Currency
   '99028': 'USD',       // דולר ארה"ב (USD cash position)
 };
 
-// Hebrew name to symbol mapping (fallback)
+// Hebrew name to symbol mapping (fallback - only for actual US stocks/ETFs)
 const ETF_NAME_MAPPING: Record<string, string> = {
-  'איישרס.חmsciacw': 'ACWI',
-  'איישרס.חmsci acw': 'ACWI',
-  'איישרס.חmsci em': 'EEM',
-  'איישרס.חמסצי אי.אם': 'EEM',
-  'ואנגארד ס.פ 500': 'VOO',
-  'ואנגארד ס&פ 500': 'VOO',
-  'spdr s&p 500': 'SPY',
-  'invesco qqq': 'QQQ',
 };
 
-// Israeli security numbers to TASE symbols (Yahoo uses .TA suffix)
-// These can be looked up at: https://www.tase.co.il/
+// Israeli security numbers to TASE symbols (optional manual overrides if needed)
 const ISRAELI_SECURITY_MAPPING: Record<string, string> = {
-  // Add Israeli securities here as: 'securityNumber': 'SYMBOL.TA'
-  // Example: '1082128': 'TEVA.TA',
 };
 
 /**
@@ -407,16 +385,9 @@ function parseRow(row: Record<string, unknown>): TransactionInput | null {
     price = price / 100;
   }
   
-  // Convert ILS prices to USD for consistent portfolio calculations
-  // Use a default exchange rate (will be overwritten by real-time rates in display)
-  const DEFAULT_USD_ILS_RATE = 3.6;
-  const finalCurrency = needsAgorotConversion ? 'ILS' : currency;
-  
-  if (price && finalCurrency === 'ILS') {
-    const priceInUSD = price / DEFAULT_USD_ILS_RATE;
-    console.log(`Converting ILS to USD: ${rawSymbol} ${price} ILS -> ${priceInUSD.toFixed(2)} USD`);
-    price = priceInUSD;
-  }
+  // Determine true currency: Israeli securities/transactions are in ILS, foreign are in USD
+  const isIsraeli = isIsraeliTransactionType(rawType) || /^\d{6,7}$/.test(rawSymbol) || currency === 'ILS';
+  const finalCurrency: 'USD' | 'ILS' = isIsraeli ? 'ILS' : 'USD';
   
   // For fee transactions, use the raw name; otherwise use cleaned name or symbol
   const name = type === 'fee' 
@@ -430,7 +401,7 @@ function parseRow(row: Record<string, unknown>): TransactionInput | null {
     name,
     quantity: row.quantity ? Math.abs(Number(row.quantity)) : undefined,
     price,
-    currency: 'USD', // Always store in USD for consistent calculations
+    currency: finalCurrency,
     commission: row.commission ? Math.abs(Number(row.commission)) : 0,
     additionalFees: row.additionalFees ? Math.abs(Number(row.additionalFees)) : 0,
     totalAmountUSD: row.totalAmountUSD ? Number(row.totalAmountUSD) : undefined,
@@ -458,16 +429,6 @@ function transformColumns(rows: Record<string, unknown>[]): Record<string, unkno
       if (row[hebrewKey] !== undefined) {
         transformed[englishKey] = row[hebrewKey];
       }
-    }
-    
-    // Log first few rows for debugging
-    if (index < 3) {
-      console.log(`Row ${index}:`, { 
-        rawSymbol: row["מס' נייר / סימבול"] || row["מס' נייר"] || row["סימבול"],
-        rawName: row["שם נייר"],
-        transformedSymbol: transformed.symbol,
-        transformedName: transformed.name
-      });
     }
     
     return transformed;
@@ -502,8 +463,8 @@ export function parseExcelFile(buffer: ArrayBuffer): ImportResult {
     // Transform column names
     const rows = transformColumns(rawRows);
     
-    // Parse each row
-    for (let i = 0; i < rows.length; i++) {
+    // Parse each row in chronological order (Meitav exports newest at top, so reverse to process oldest first)
+    for (let i = rows.length - 1; i >= 0; i--) {
       try {
         const transaction = parseRow(rows[i]);
         
@@ -539,9 +500,10 @@ export function createTransactionHash(transaction: TransactionInput): string {
   const price = transaction.price?.toFixed(4) || '0';
   const type = transaction.type;
   const rawType = transaction.rawType || '';
+  const currency = transaction.currency || 'USD';
   const totalUSD = transaction.totalAmountUSD?.toFixed(2) || '0';
   const totalILS = transaction.totalAmountILS?.toFixed(2) || '0';
   
   // Include more fields for better uniqueness
-  return `${dateStr}_${symbol}_${name}_${type}_${rawType}_${quantity}_${price}_${totalUSD}_${totalILS}`;
+  return `${dateStr}_${symbol}_${name}_${type}_${rawType}_${currency}_${quantity}_${price}_${totalUSD}_${totalILS}`;
 }

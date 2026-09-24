@@ -5,7 +5,7 @@ import { StatCard, Card, Button } from '@/components/ui';
 import { HoldingsTable } from './HoldingsTable';
 
 function formatCurrency(value: number, currency: string = 'USD'): string {
-  const formatter = new Intl.NumberFormat('en-US', {
+  const formatter = new Intl.NumberFormat(currency === 'ILS' ? 'he-IL' : 'en-US', {
     style: 'currency',
     currency,
     minimumFractionDigits: 2,
@@ -69,26 +69,28 @@ export function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="שווי התיק"
-          value={isLoading ? '---' : formatCurrency(totalValue)}
-          subtitle={isLoading ? '---' : `${formatCurrency(totalValueILS, 'ILS')} ₪`}
+          value={isLoading ? '---' : formatCurrency(totalValueILS, 'ILS')}
+          subtitle={isLoading ? '---' : formatCurrency(totalValue, 'USD')}
           icon={<span className="text-2xl">💰</span>}
         />
         <StatCard
           title="רווח/הפסד כולל"
-          value={isLoading ? '---' : formatCurrency(totalPnL)}
+          value={isLoading ? '---' : formatCurrency(totalPnL * usdIlsRate, 'ILS')}
+          subtitle={isLoading ? '---' : formatCurrency(totalPnL, 'USD')}
           trend={isLoading ? undefined : { value: totalPnLPercent, isPositive: isProfitable }}
           icon={<span className="text-2xl">{isProfitable ? '📈' : '📉'}</span>}
         />
         <StatCard
           title="שינוי יומי"
-          value={isLoading ? '---' : `${isDayPositive ? '+' : ''}${formatCurrency(dayChange)}`}
+          value={isLoading ? '---' : `${isDayPositive ? '+' : ''}${formatCurrency(dayChange * usdIlsRate, 'ILS')}`}
+          subtitle={isLoading ? '---' : `${isDayPositive ? '+' : ''}${formatCurrency(dayChange, 'USD')}`}
           trend={isLoading ? undefined : { value: dayChangePercent, isPositive: isDayPositive }}
           icon={<span className="text-2xl">{isDayPositive ? '🟢' : '🔴'}</span>}
         />
         <StatCard
           title="מספר אחזקות"
           value={isLoading ? '---' : holdings.length.toString()}
-          subtitle={isLoading ? '---' : 'מניות וקרנות סל'}
+          subtitle={isLoading ? '---' : 'מניות וקרנות סל פעילות'}
           icon={<span className="text-2xl">📊</span>}
         />
       </div>

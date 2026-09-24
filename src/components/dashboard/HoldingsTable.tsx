@@ -9,7 +9,7 @@ interface HoldingsTableProps {
 }
 
 function formatCurrency(value: number, currency: string = 'USD'): string {
-  const formatter = new Intl.NumberFormat('en-US', {
+  const formatter = new Intl.NumberFormat(currency === 'ILS' ? 'he-IL' : 'en-US', {
     style: 'currency',
     currency,
     minimumFractionDigits: 2,
@@ -77,6 +77,7 @@ export function HoldingsTable({ holdings, isLoading, usdIlsRate = 3.7 }: Holding
           {holdings.map((holding, index) => {
             const isProfitable = (holding.pnl || 0) >= 0;
             const isDayPositive = (holding.dayChange || 0) >= 0;
+            const currency = holding.currency || 'USD';
             
             return (
               <tr 
@@ -86,48 +87,71 @@ export function HoldingsTable({ holdings, isLoading, usdIlsRate = 3.7 }: Holding
                 <td className="py-4 px-4">
                   <a 
                     href={`/stock/${holding.symbol}`}
-                    className="font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                    className="font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer block"
                   >
                     {holding.name}
                   </a>
                 </td>
                 <td className="py-4 px-4">
-                  <a 
-                    href={`/stock/${holding.symbol}`}
-                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
-                  >
-                    {holding.symbol}
-                  </a>
+                  <div className="flex flex-col items-start gap-1">
+                    <a 
+                      href={`/stock/${holding.symbol}`}
+                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+                    >
+                      {holding.symbol}
+                    </a>
+                    {holding.hasLiveQuote ? (
+                      <span 
+                        className="inline-flex items-center gap-1 text-[11px] text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/40 px-1.5 py-0.5 rounded border border-green-200 dark:border-green-800"
+                        title="ציטוט חי מעודכן מ-Yahoo Finance"
+                      >
+                        🟢 ציטוט חי
+                      </span>
+                    ) : (
+                      <span 
+                        className="inline-flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800"
+                        title="אין ציטוט חי מבורסת תל אביב - המחיר מעודכן לפי העסקה האחרונה בדוח"
+                      >
+                        ⏱️ מחיר מעסקה
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="py-4 px-4 text-gray-700 dark:text-gray-300">
                   {formatNumber(holding.quantity, holding.quantity % 1 === 0 ? 0 : 4)}
                 </td>
                 <td className="py-4 px-4 font-medium text-gray-900 dark:text-white">
-                  {formatCurrency(holding.currentPrice || 0)}
+                  {formatCurrency(holding.currentPrice || 0, currency)}
                 </td>
                 <td className="py-4 px-4">
-                  <div className={`flex flex-col ${isDayPositive ? 'text-green-600' : 'text-red-600'}`}>
-                    <span className="font-medium">
-                      {isDayPositive ? '+' : ''}{formatCurrency(holding.dayChange || 0)}
+                  {holding.hasLiveQuote ? (
+                    <div className={`flex flex-col ${isDayPositive ? 'text-green-600' : 'text-red-600'}`}>
+                      <span className="font-medium">
+                        {isDayPositive ? '+' : ''}{formatCurrency(holding.dayChange || 0, currency)}
+                      </span>
+                      <span className="text-xs">
+                        {formatPercent(holding.dayChangePercent || 0)}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-gray-400 dark:text-gray-500 text-xs">
+                      —
                     </span>
-                    <span className="text-xs">
-                      {formatPercent(holding.dayChangePercent || 0)}
-                    </span>
-                  </div>
+                  )}
                 </td>
                 <td className="py-4 px-4 text-gray-700 dark:text-gray-300">
-                  {formatCurrency(holding.avgPrice)}
+                  {formatCurrency(holding.avgPrice, currency)}
                 </td>
                 <td className="py-4 px-4 font-medium text-gray-900 dark:text-white">
-                  {formatCurrency(holding.currentValue || 0)}
+                  {formatCurrency(holding.currentValue || 0, currency)}
                 </td>
-                <td className="py-4 px-4 text-gray-600 dark:text-gray-400">
-                  {formatNumber((holding.currentValue || 0) * usdIlsRate, 0)} ₪
+                <td className="py-4 px-4 font-semibold text-gray-800 dark:text-gray-200">
+                  {formatNumber(holding.currentValueILS || 0, 0)} ₪
                 </td>
                 <td className="py-4 px-4">
                   <div className={`flex flex-col ${isProfitable ? 'text-green-600' : 'text-red-600'}`}>
                     <span className="font-medium">
-                      {isProfitable ? '+' : ''}{formatCurrency(holding.pnl || 0)}
+                      {isProfitable ? '+' : ''}{formatCurrency(holding.pnl || 0, currency)}
                     </span>
                     <span className="text-xs">
                       {formatPercent(holding.pnlPercent || 0)}

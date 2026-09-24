@@ -52,6 +52,11 @@ export interface HoldingWithMarketData {
   pnlPercent?: number;
   dayChange?: number;
   dayChangePercent?: number;
+  hasLiveQuote?: boolean;
+  currentValueILS?: number;
+  currentValueUSD?: number;
+  totalCostILS?: number;
+  totalCostUSD?: number;
 }
 
 // ============================================

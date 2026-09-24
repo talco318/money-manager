@@ -2,5 +2,6 @@ export {
   calculateHoldings, 
   syncHoldings, 
   calculateCashBalance,
-  getPortfolioStats 
+  getPortfolioStats,
+  repairLegacyTransactions 
 } from './calculator';

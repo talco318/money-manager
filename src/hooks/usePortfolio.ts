@@ -46,8 +46,8 @@ export function usePortfolio(): UsePortfolioResult {
       setIsLoading(true);
       setError(null);
 
-      // Fetch holdings from database
-      const holdingsRes = await fetch('/api/holdings');
+      // Fetch holdings from database (with sync)
+      const holdingsRes = await fetch('/api/holdings?refresh=true');
       const holdingsData = await holdingsRes.json();
 
       if (!holdingsData.success) {
@@ -99,22 +99,52 @@ export function usePortfolio(): UsePortfolioResult {
       }
 
       // Combine holdings with market data
-      let totalValue = 0;
-      let totalCost = 0;
-      let totalDayChange = 0;
+      let totalSecuritiesValueILS = 0;
+      let totalSecuritiesCostILS = 0;
+      let totalSecuritiesDayChangeILS = 0;
 
       const enrichedHoldings: HoldingWithMarketData[] = dbHoldings.map(holding => {
         const quote = quotesMap.get(holding.symbol);
-        const currentPrice = quote?.price || holding.avgPrice;
-        const currentValue = holding.quantity * currentPrice;
-        const pnl = currentValue - holding.totalCost;
-        const pnlPercent = holding.totalCost > 0 ? (pnl / holding.totalCost) * 100 : 0;
-        const dayChange = quote ? holding.quantity * quote.change : 0;
-        const dayChangePercent = quote?.changePercent || 0;
+        const hasLiveQuote = Boolean(quote && quote.price && quote.price > 0);
+        const currentPrice = hasLiveQuote ? (quote?.price || 0) : holding.avgPrice;
+        
+        const isUSD = (holding.currency || '').toUpperCase() === 'USD';
+        
+        // Native currency values
+        const currentValueNative = holding.quantity * currentPrice;
+        const totalCostNative = holding.totalCost;
+        const pnlNative = currentValueNative - totalCostNative;
+        const pnlPercent = totalCostNative > 0 ? (pnlNative / totalCostNative) * 100 : 0;
+        
+        // Daily change
+        const dayChangeNative = hasLiveQuote && quote ? holding.quantity * quote.change : 0;
+        const dayChangePercent = hasLiveQuote && quote ? quote.changePercent : 0;
 
-        totalValue += currentValue;
-        totalCost += holding.totalCost;
-        totalDayChange += dayChange;
+        // Multi-currency conversions
+        let currentValueUSD = 0;
+        let currentValueILS = 0;
+        let totalCostUSD = 0;
+        let totalCostILS = 0;
+        let dayChangeILS = 0;
+
+        if (isUSD) {
+          currentValueUSD = currentValueNative;
+          currentValueILS = currentValueNative * rate;
+          totalCostUSD = totalCostNative;
+          totalCostILS = totalCostNative * rate;
+          dayChangeILS = dayChangeNative * rate;
+        } else {
+          // ILS
+          currentValueILS = currentValueNative;
+          currentValueUSD = rate > 0 ? currentValueNative / rate : 0;
+          totalCostILS = totalCostNative;
+          totalCostUSD = rate > 0 ? totalCostNative / rate : 0;
+          dayChangeILS = dayChangeNative;
+        }
+
+        totalSecuritiesValueILS += currentValueILS;
+        totalSecuritiesCostILS += totalCostILS;
+        totalSecuritiesDayChangeILS += dayChangeILS;
 
         return {
           id: holding.id,
@@ -122,35 +152,53 @@ export function usePortfolio(): UsePortfolioResult {
           name: holding.name,
           quantity: holding.quantity,
           avgPrice: holding.avgPrice,
-          currency: holding.currency,
-          totalCost: holding.totalCost,
+          currency: holding.currency || 'USD',
+          totalCost: totalCostNative,
           currentPrice,
-          currentValue,
-          pnl,
+          currentValue: currentValueNative,
+          pnl: pnlNative,
           pnlPercent,
-          dayChange,
+          dayChange: dayChangeNative,
           dayChangePercent,
+          hasLiveQuote,
+          currentValueILS,
+          currentValueUSD,
+          totalCostILS,
+          totalCostUSD,
         };
       });
 
-      // Sort by value (largest first)
-      enrichedHoldings.sort((a, b) => (b.currentValue || 0) - (a.currentValue || 0));
+      // Sort by value in ILS (largest first)
+      enrichedHoldings.sort((a, b) => (b.currentValueILS || 0) - (a.currentValueILS || 0));
 
-      const totalPnL = totalValue - totalCost;
-      const totalPnLPercent = totalCost > 0 ? (totalPnL / totalCost) * 100 : 0;
-      const dayChangePercent = totalValue > 0 ? (totalDayChange / (totalValue - totalDayChange)) * 100 : 0;
+      // Cash balances
+      const cashILS = holdingsData.data.cashBalance?.ils || 0;
+      const cashUSD = holdingsData.data.cashBalance?.usd || 0;
+      const totalCashILS = cashILS + (cashUSD * rate);
+
+      const portfolioTotalValueILS = totalSecuritiesValueILS + totalCashILS;
+      const portfolioTotalValueUSD = rate > 0 ? portfolioTotalValueILS / rate : 0;
+
+      const totalPnLILS = totalSecuritiesValueILS - totalSecuritiesCostILS;
+      const totalPnLUSD = rate > 0 ? totalPnLILS / rate : 0;
+      const totalPnLPercent = totalSecuritiesCostILS > 0 ? (totalPnLILS / totalSecuritiesCostILS) * 100 : 0;
+
+      const totalDayChangeUSD = rate > 0 ? totalSecuritiesDayChangeILS / rate : 0;
+      const dayChangePercent = totalSecuritiesValueILS > 0 
+        ? (totalSecuritiesDayChangeILS / (totalSecuritiesValueILS - totalSecuritiesDayChangeILS)) * 100 
+        : 0;
 
       setHoldings(enrichedHoldings);
       setSummary({
-        totalValue,
-        totalValueILS: totalValue * rate,
-        totalCost,
-        totalPnL,
+        totalValue: portfolioTotalValueUSD,
+        totalValueILS: portfolioTotalValueILS,
+        totalCost: rate > 0 ? totalSecuritiesCostILS / rate : 0,
+        totalPnL: totalPnLUSD,
         totalPnLPercent,
-        dayChange: totalDayChange,
+        dayChange: totalDayChangeUSD,
         dayChangePercent,
-        cashBalance: holdingsData.data.cashBalance?.ils || 0,
-        cashBalanceILS: holdingsData.data.cashBalance?.ils || 0,
+        cashBalance: cashILS,
+        cashBalanceILS: totalCashILS,
         holdings: enrichedHoldings,
       });
       setLastUpdated(new Date());

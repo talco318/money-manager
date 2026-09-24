@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
         rawType: true,
         quantity: true,
         price: true,
+        currency: true,
         totalAmountUSD: true,
         totalAmountILS: true,
       },
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
         price: t.price || undefined,
         totalAmountUSD: t.totalAmountUSD || undefined,
         totalAmountILS: t.totalAmountILS || undefined,
-        currency: 'USD',
+        currency: (t.currency as 'USD' | 'ILS') || 'USD',
       });
       existingHashCounts.set(hash, (existingHashCounts.get(hash) || 0) + 1);
     });

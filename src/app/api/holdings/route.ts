@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { syncHoldings, getPortfolioStats } from '@/lib/holdings';
+import { syncHoldings, getPortfolioStats, calculateCashBalance } from '@/lib/holdings';
 
 // GET - Fetch all holdings with optional recalculation
 export async function GET(request: NextRequest) {
@@ -18,13 +18,15 @@ export async function GET(request: NextRequest) {
       orderBy: { symbol: 'asc' },
     });
 
-    // Get portfolio stats
+    // Get portfolio stats and cash balances
     const stats = await getPortfolioStats();
+    const cashBalance = await calculateCashBalance();
 
     return NextResponse.json({
       success: true,
       data: {
         holdings,
+        cashBalance,
         stats: {
           totalCost: stats.totalCost,
           totalHoldings: stats.totalHoldings,

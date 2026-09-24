@@ -31,7 +31,10 @@ export async function calculateHoldings(): Promise<Map<string, HoldingData>> {
       type: { in: ['buy', 'sell', 'split', 'capital_reduction', 'stock_dividend'] },
       symbol: { not: null },
     },
-    orderBy: { date: 'asc' },
+    orderBy: [
+      { date: 'asc' },
+      { createdAt: 'asc' },
+    ],
     select: {
       id: true,
       date: true,
@@ -41,7 +44,28 @@ export async function calculateHoldings(): Promise<Map<string, HoldingData>> {
       quantity: true,
       price: true,
       currency: true,
+      createdAt: true,
     },
+  });
+
+  // Intra-day ordering: For transactions on the same date, always process buys/splits before sells.
+  // This guarantees that day-trades (bought and sold same day) or options that were closed
+  // have the required lots to sell from and cleanly resolve to 0 holdings.
+  const TYPE_PRIORITY: Record<string, number> = {
+    split: 1,
+    stock_dividend: 1,
+    buy: 2,
+    capital_reduction: 3,
+    sell: 4,
+  };
+
+  transactions.sort((a, b) => {
+    const timeDiff = a.date.getTime() - b.date.getTime();
+    if (timeDiff !== 0) return timeDiff;
+    const pA = TYPE_PRIORITY[a.type] || 5;
+    const pB = TYPE_PRIORITY[b.type] || 5;
+    if (pA !== pB) return pA - pB;
+    return a.createdAt.getTime() - b.createdAt.getTime();
   });
 
   // Group transactions by symbol
@@ -83,6 +107,9 @@ export async function calculateHoldings(): Promise<Map<string, HoldingData>> {
       holding.quantity += quantity;
       holding.totalCost += quantity * price;
       holding.avgPrice = holding.quantity > 0 ? holding.totalCost / holding.quantity : 0;
+      if (tx.currency) {
+        holding.currency = tx.currency;
+      }
       
       // Update name if we have a better one
       if (tx.name && tx.name !== symbol) {
@@ -118,7 +145,9 @@ export async function calculateHoldings(): Promise<Map<string, HoldingData>> {
         holding.quantity = 0;
         holding.totalCost = 0;
         holding.avgPrice = 0;
+        lots.length = 0; // Clear any lot rounding residues
       } else {
+        holding.totalCost = Math.max(0, holding.totalCost);
         holding.avgPrice = holding.totalCost / holding.quantity;
       }
     } else if (tx.type === 'split' || tx.type === 'stock_dividend') {
@@ -164,7 +193,9 @@ export async function calculateHoldings(): Promise<Map<string, HoldingData>> {
         holding.quantity = 0;
         holding.totalCost = 0;
         holding.avgPrice = 0;
+        lots.length = 0;
       } else {
+        holding.totalCost = Math.max(0, holding.totalCost);
         holding.avgPrice = holding.totalCost / holding.quantity;
       }
       
@@ -184,10 +215,92 @@ export async function calculateHoldings(): Promise<Map<string, HoldingData>> {
 }
 
 /**
+ * Automatically repair any legacy transactions that were imported with older buggy mapping
+ * (e.g. Israeli ETFs mapped to US tickers VOO/SPY/ACWI/EEM, or prices divided by 3.6).
+ */
+export async function repairLegacyTransactions(): Promise<number> {
+  try {
+    const legacyTransactions = await prisma.transaction.findMany({
+      where: {
+        OR: [
+          { symbol: { in: ['VOO', 'SPY', 'ACWI', 'EEM', 'TA125.TA', 'BKIR.TA'] } },
+          { name: { contains: 'SPX 500' } },
+          { name: { contains: 'S&P500' } },
+          { name: { contains: 'MSCI' } },
+          { name: { contains: 'ת"א 125' } },
+          { name: { contains: 'בנק ישר' } },
+        ],
+      },
+    });
+
+    let repairedCount = 0;
+
+    for (const tx of legacyTransactions) {
+      let targetSymbol: string | null = null;
+      let targetCurrency: string = tx.currency;
+      const name = tx.name || '';
+      const sym = tx.symbol || '';
+
+      if (sym === 'VOO' || name.includes('SPX 500')) {
+        targetSymbol = '1159250';
+        targetCurrency = 'ILS';
+      } else if (sym === 'SPY' || name.includes('אינ.חוץS&P500') || name.includes('אינ.חוץ S&P500')) {
+        targetSymbol = '1183441';
+        targetCurrency = 'ILS';
+      } else if (sym === 'ACWI' || name.includes('MSCIACW') || name.includes('MS ACWI')) {
+        targetSymbol = '1159235';
+        targetCurrency = 'ILS';
+      } else if (sym === 'EEM' || name.includes('MSCI EM')) {
+        targetSymbol = '1159169';
+        targetCurrency = 'ILS';
+      } else if (sym === 'TA125.TA' || name.includes('ת"א 125')) {
+        targetSymbol = '1238203';
+        targetCurrency = 'ILS';
+      } else if (sym === 'BKIR.TA' || name.includes('בנק ישר')) {
+        targetSymbol = '1148949';
+        targetCurrency = 'ILS';
+      }
+
+      if (targetSymbol) {
+        let targetPrice = tx.price;
+        // If price was divided by 3.6 during legacy import, restore real price from totalAmountILS / quantity
+        if (tx.totalAmountILS && tx.quantity && tx.quantity > 0) {
+          const truePrice = Math.abs(tx.totalAmountILS / tx.quantity);
+          if (tx.price && Math.abs(tx.price * 3.6 - truePrice) < 5) {
+            targetPrice = Math.round(truePrice * 100) / 100;
+          }
+        }
+
+        await prisma.transaction.update({
+          where: { id: tx.id },
+          data: {
+            symbol: targetSymbol,
+            currency: targetCurrency,
+            price: targetPrice,
+          },
+        });
+        repairedCount++;
+      }
+    }
+
+    if (repairedCount > 0) {
+      console.log(`Repaired ${repairedCount} legacy transactions in database`);
+    }
+    return repairedCount;
+  } catch (error) {
+    console.error('Error during legacy transaction repair:', error);
+    return 0;
+  }
+}
+
+/**
  * Sync holdings table with calculated values
  * This updates the Holding table in the database
  */
 export async function syncHoldings(): Promise<void> {
+  // First auto-repair any corrupted/legacy transactions if present
+  await repairLegacyTransactions();
+
   const calculatedHoldings = await calculateHoldings();
 
   // Get existing holdings from DB
@@ -242,12 +355,11 @@ export async function calculateCashBalance(): Promise<{ usd: number; ils: number
 
   // Sum up USD transactions
   const usdTransactions = await prisma.transaction.aggregate({
-    where: { currency: 'USD' },
     _sum: { totalAmountUSD: true },
   });
 
   return {
-    usd: 0, // We'd need to track USD cash separately
+    usd: Math.max(0, usdTransactions._sum.totalAmountUSD || 0),
     ils: latestWithBalance?.cashBalance || 0,
   };
 }

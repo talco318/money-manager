@@ -49,3 +49,9 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# User financial reports
+/excels/
+*.xlsx
+*.xls
+
