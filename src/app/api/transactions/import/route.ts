@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
     // Filter out duplicates
     const newTransactions: TransactionInput[] = [];
     let duplicates = 0;
+    const duplicateDetails: Array<{ hash: string; transaction: Partial<TransactionInput> }> = [];
 
     for (const transaction of parseResult.transactions) {
       const hash = createTransactionHash(transaction);
@@ -87,7 +88,30 @@ export async function POST(request: NextRequest) {
         existingHashes.add(hash); // Prevent duplicates within the same import
       } else {
         duplicates++;
+        // Log first 10 duplicates for debugging
+        if (duplicateDetails.length < 10) {
+          duplicateDetails.push({
+            hash,
+            transaction: {
+              date: transaction.date,
+              symbol: transaction.symbol,
+              name: transaction.name,
+              type: transaction.type,
+              rawType: transaction.rawType,
+              quantity: transaction.quantity,
+              price: transaction.price,
+            }
+          });
+        }
       }
+    }
+
+    // Log duplicates for debugging
+    if (duplicateDetails.length > 0) {
+      console.log(`Found ${duplicates} duplicates. First ${duplicateDetails.length} examples:`);
+      duplicateDetails.forEach((d, i) => {
+        console.log(`Duplicate ${i + 1}: ${d.hash}`, JSON.stringify(d.transaction));
+      });
     }
 
     // Insert new transactions
