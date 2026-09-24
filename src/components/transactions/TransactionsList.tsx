@@ -215,18 +215,18 @@ export function TransactionsList() {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" dir="rtl">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700">
                   <th className="text-right py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">תאריך</th>
                   <th className="text-right py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">סוג</th>
                   <th className="text-right py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">נייר</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">כמות</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">מחיר</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">עמלה</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">סה״כ $</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">סה״כ ₪</th>
+                  <th className="text-right py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">כמות</th>
+                  <th className="text-right py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">מחיר</th>
+                  <th className="text-right py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">עמלה</th>
+                  <th className="text-right py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">סה״כ $</th>
+                  <th className="text-right py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">סה״כ ₪</th>
                   <th className="text-center py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">פעולות</th>
                 </tr>
               </thead>
@@ -256,19 +256,19 @@ export function TransactionsList() {
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-gray-700 dark:text-gray-300">
+                    <td className="py-3 px-4 text-gray-700 dark:text-gray-300" dir="ltr">
                       {tx.quantity ? formatNumber(tx.quantity, tx.quantity % 1 === 0 ? 0 : 4) : '-'}
                     </td>
-                    <td className="py-3 px-4 text-gray-700 dark:text-gray-300">
+                    <td className="py-3 px-4 text-gray-700 dark:text-gray-300" dir="ltr">
                       {tx.price ? formatCurrency(tx.price, tx.currency) : '-'}
                     </td>
-                    <td className="py-3 px-4 text-gray-500 dark:text-gray-400">
+                    <td className="py-3 px-4 text-gray-500 dark:text-gray-400" dir="ltr">
                       {tx.commission ? formatCurrency(tx.commission, tx.currency) : '-'}
                     </td>
-                    <td className="py-3 px-4 font-medium text-gray-900 dark:text-white">
+                    <td className="py-3 px-4 font-medium text-gray-900 dark:text-white" dir="ltr">
                       {formatCurrency(tx.totalAmountUSD, 'USD')}
                     </td>
-                    <td className="py-3 px-4 text-gray-700 dark:text-gray-300">
+                    <td className="py-3 px-4 text-gray-700 dark:text-gray-300" dir="ltr">
                       {tx.totalAmountILS ? `₪${formatNumber(tx.totalAmountILS)}` : '-'}
                     </td>
                     <td className="py-3 px-4 text-center">
