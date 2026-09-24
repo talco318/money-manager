@@ -68,6 +68,7 @@ export function TransactionsList() {
   } = useTransactions();
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteAllModalOpen, setDeleteAllModalOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -86,6 +87,24 @@ export function TransactionsList() {
     if (success) {
       setDeleteModalOpen(false);
       setTransactionToDelete(null);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    setIsDeleting(true);
+    try {
+      const response = await fetch('/api/transactions?all=true', {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+      if (data.success) {
+        setDeleteAllModalOpen(false);
+        refresh();
+      }
+    } catch (err) {
+      console.error('Error deleting all:', err);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -186,9 +205,16 @@ export function TransactionsList() {
       <Card 
         title="היסטוריית עסקאות"
         action={
-          <Button variant="outline" size="sm" onClick={refresh} disabled={isLoading}>
-            {isLoading ? 'טוען...' : 'רענן'}
-          </Button>
+          <div className="flex gap-2">
+            {stats.total > 0 && (
+              <Button variant="danger" size="sm" onClick={() => setDeleteAllModalOpen(true)}>
+                מחק הכל
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={refresh} disabled={isLoading}>
+              {isLoading ? 'טוען...' : 'רענן'}
+            </Button>
+          </div>
         }
       >
         {isLoading ? (
@@ -322,6 +348,30 @@ export function TransactionsList() {
             </Button>
             <Button variant="danger" onClick={handleConfirmDelete} disabled={isDeleting}>
               {isDeleting ? 'מוחק...' : 'מחק עסקה'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete All Confirmation Modal */}
+      <Modal
+        isOpen={deleteAllModalOpen}
+        onClose={() => setDeleteAllModalOpen(false)}
+        title="מחיקת כל העסקאות"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-700 dark:text-gray-300">
+            האם אתה בטוח שברצונך למחוק את <strong>כל {stats.total} העסקאות</strong>?
+          </p>
+          <p className="text-sm text-red-600 dark:text-red-400 font-medium">
+            ⚠️ פעולה זו תמחק את כל העסקאות והאחזקות ואינה ניתנת לביטול!
+          </p>
+          <div className="flex gap-3 justify-end">
+            <Button variant="secondary" onClick={() => setDeleteAllModalOpen(false)}>
+              ביטול
+            </Button>
+            <Button variant="danger" onClick={handleDeleteAll} disabled={isDeleting}>
+              {isDeleting ? 'מוחק...' : 'מחק הכל'}
             </Button>
           </div>
         </div>

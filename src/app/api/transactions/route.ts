@@ -154,11 +154,23 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// DELETE - Delete a transaction
+// DELETE - Delete a transaction (single or all)
 export async function DELETE(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
+    const deleteAll = searchParams.get('all');
+
+    // Delete all transactions
+    if (deleteAll === 'true') {
+      await prisma.transaction.deleteMany({});
+      await prisma.holding.deleteMany({});
+      
+      return NextResponse.json({
+        success: true,
+        message: 'כל העסקאות נמחקו בהצלחה',
+      });
+    }
 
     if (!id) {
       return NextResponse.json(
