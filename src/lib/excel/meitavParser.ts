@@ -124,21 +124,49 @@ function parseCurrency(currencyStr: string): { currency: 'USD' | 'ILS', isAgorot
 }
 
 /**
- * Check if a security is Israeli (traded in Agorot)
- * Israeli securities have 6-7 digit numbers and trade in Agorot
+ * Check if a security price is in Agorot and needs conversion to ILS
+ * 
+ * Key insight: Securities traded on TASE (Israeli exchange) are priced in AGOROT,
+ * even if they're international ETFs like ACWI or EEM.
+ * 
+ * The Excel shows currency as ₪ but the price is actually in Agorot (1/100 shekel)
+ * Example: 34820₪ actually means 34820 Agorot = 348.20 ILS
  */
-function isIsraeliSecurity(symbol: string | undefined, currencyStr: string): boolean {
+function isIsraeliSecurityInAgorot(symbol: string | undefined, price: number | undefined, currencyStr: string): boolean {
   if (!symbol) return false;
   const str = String(symbol).trim();
   
-  // If currency indicates Agorot
+  // If currency explicitly indicates Agorot
   if (currencyStr && (currencyStr.includes('אג') || currencyStr.toLowerCase().includes('agr'))) {
+    console.log(`Agorot detected by currency string for ${str}`);
+    return true;
+  }
+  
+  // Check if currency is ILS (שח or ₪)
+  const isILS = currencyStr && (
+    currencyStr.includes('₪') || 
+    currencyStr.includes('שח') || 
+    currencyStr.toLowerCase().includes('ils') ||
+    currencyStr.toLowerCase().includes('שקל')
+  );
+  
+  // If it's NOT ILS, it's probably USD - no conversion needed
+  if (!isILS) {
+    return false;
+  }
+  
+  // If ILS and price is very high (over 100), it's almost certainly Agorot
+  // Real stock prices in ILS would rarely exceed 100 ILS per share
+  // But Agorot prices are commonly 10000-50000 (100-500 ILS)
+  if (price && price > 100) {
+    console.log(`Agorot detected by high ILS price: ${str} at ${price} (likely ${price / 100} ILS)`);
     return true;
   }
   
   // Israeli security numbers are typically 6-7 digits
-  // And NOT in our international ETF mapping
-  if (/^\d{6,7}$/.test(str) && !ETF_SYMBOL_MAPPING[str]) {
+  // These are ALWAYS traded in Agorot on TASE
+  if (/^\d{6,7}$/.test(str)) {
+    console.log(`Agorot detected by Israeli security number: ${str}`);
     return true;
   }
   
@@ -266,13 +294,16 @@ function parseRow(row: Record<string, unknown>): TransactionInput | null {
   const currencyStr = String(row.currency || '').trim();
   const { currency, isAgorot } = parseCurrency(currencyStr);
   
-  // Check if this is an Israeli security (prices in Agorot)
-  const isIsraeli = isAgorot || isIsraeliSecurity(rawSymbol, currencyStr);
-  
-  // Parse price - convert from Agorot to Shekels if needed
+  // Parse raw price first
   let price = row.price ? Math.abs(Number(row.price)) : undefined;
-  if (price && isIsraeli) {
-    price = price / 100; // Convert Agorot to Shekels
+  
+  // Check if this is an Israeli security with price in Agorot
+  const needsAgorotConversion = isAgorot || isIsraeliSecurityInAgorot(rawSymbol, price, currencyStr);
+  
+  // Convert from Agorot to Shekels if needed
+  if (price && needsAgorotConversion) {
+    console.log(`Converting Agorot to ILS: ${rawSymbol} ${price} -> ${price / 100}`);
+    price = price / 100;
   }
   
   // For fee transactions, use the raw name; otherwise use cleaned name or symbol
@@ -287,7 +318,7 @@ function parseRow(row: Record<string, unknown>): TransactionInput | null {
     name,
     quantity: row.quantity ? Math.abs(Number(row.quantity)) : undefined,
     price,
-    currency: isIsraeli ? 'ILS' : currency,
+    currency: needsAgorotConversion ? 'ILS' : currency,
     commission: row.commission ? Math.abs(Number(row.commission)) : 0,
     additionalFees: row.additionalFees ? Math.abs(Number(row.additionalFees)) : 0,
     totalAmountUSD: row.totalAmountUSD ? Number(row.totalAmountUSD) : undefined,
