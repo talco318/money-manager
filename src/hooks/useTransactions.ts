@@ -74,7 +74,12 @@ export function useTransactions(): UseTransactionsResult {
         throw new Error(data.error || 'Failed to fetch transactions');
       }
 
-      setTransactions(data.data || []);
+      // API returns { transactions, pagination } for general requests
+      // or just an array for symbol-specific requests
+      const txList = Array.isArray(data.data) 
+        ? data.data 
+        : (data.data?.transactions || []);
+      setTransactions(txList);
     } catch (err) {
       console.error('Error fetching transactions:', err);
       setError(err instanceof Error ? err.message : 'שגיאה בטעינת העסקאות');
