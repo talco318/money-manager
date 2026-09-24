@@ -7,6 +7,9 @@ const COLUMN_MAPPING: Record<string, string> = {
   'סוג פעולה': 'rawType',
   'שם נייר': 'name',
   "מס' נייר / סימבול": 'symbol',
+  "מס' נייר": 'symbol',
+  'סימבול': 'symbol',
+  'מספר נייר': 'symbol',
   'כמות': 'quantity',
   'שער ביצוע': 'price',
   'מטבע': 'currency',
@@ -220,13 +223,28 @@ function parseRow(row: Record<string, unknown>): TransactionInput | null {
  * Transform raw Excel data to use English column names
  */
 function transformColumns(rows: Record<string, unknown>[]): Record<string, unknown>[] {
-  return rows.map(row => {
+  // Log the first row's column names for debugging
+  if (rows.length > 0) {
+    console.log('Excel column names found:', Object.keys(rows[0]));
+  }
+  
+  return rows.map((row, index) => {
     const transformed: Record<string, unknown> = {};
     
     for (const [hebrewKey, englishKey] of Object.entries(COLUMN_MAPPING)) {
       if (row[hebrewKey] !== undefined) {
         transformed[englishKey] = row[hebrewKey];
       }
+    }
+    
+    // Log first few rows for debugging
+    if (index < 3) {
+      console.log(`Row ${index}:`, { 
+        rawSymbol: row["מס' נייר / סימבול"] || row["מס' נייר"] || row["סימבול"],
+        rawName: row["שם נייר"],
+        transformedSymbol: transformed.symbol,
+        transformedName: transformed.name
+      });
     }
     
     return transformed;
