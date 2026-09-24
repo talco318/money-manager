@@ -11,8 +11,10 @@ export default function LoginPage() {
 
   // Check if already authenticated
   useEffect(() => {
-    const isAuth = localStorage.getItem('portfolio_auth');
-    if (isAuth === 'true') {
+    // Check cookie exists (client-side check for immediate redirect)
+    const cookies = document.cookie.split(';');
+    const authCookie = cookies.find(c => c.trim().startsWith('portfolio_auth='));
+    if (authCookie?.includes('true')) {
       router.push('/');
     }
   }, [router]);
@@ -32,9 +34,13 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (data.success) {
-        localStorage.setItem('portfolio_auth', 'true');
-        localStorage.setItem('portfolio_auth_time', Date.now().toString());
+        // Set cookie for middleware (expires in 7 days)
+        const expires = new Date();
+        expires.setDate(expires.getDate() + 7);
+        document.cookie = `portfolio_auth=true; path=/; expires=${expires.toUTCString()}; SameSite=Strict`;
+        
         router.push('/');
+        router.refresh();
       } else {
         setError('קוד שגוי');
         setPin('');
