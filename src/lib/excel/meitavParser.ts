@@ -104,15 +104,45 @@ function parseDate(dateStr: string): Date | null {
 }
 
 /**
- * Parse currency symbol
+ * Parse currency symbol and check if price is in Agorot
  */
-function parseCurrency(currencyStr: string): 'USD' | 'ILS' {
-  if (!currencyStr) return 'USD';
-  const str = String(currencyStr).trim();
-  if (str.includes('₪') || str.includes('שח') || str.toLowerCase() === 'ils') {
-    return 'ILS';
+function parseCurrency(currencyStr: string): { currency: 'USD' | 'ILS', isAgorot: boolean } {
+  if (!currencyStr) return { currency: 'USD', isAgorot: false };
+  const str = String(currencyStr).trim().toLowerCase();
+  
+  // Check for ILS/Shekel indicators
+  if (str.includes('₪') || str.includes('שח') || str === 'ils' || str.includes('שקל')) {
+    return { currency: 'ILS', isAgorot: false };
   }
-  return 'USD';
+  
+  // Check for Agorot (Israeli cents)
+  if (str.includes('אגורות') || str.includes('אג') || str === 'agr' || str === 'agorot') {
+    return { currency: 'ILS', isAgorot: true };
+  }
+  
+  return { currency: 'USD', isAgorot: false };
+}
+
+/**
+ * Check if a security is Israeli (traded in Agorot)
+ * Israeli securities have 6-7 digit numbers and trade in Agorot
+ */
+function isIsraeliSecurity(symbol: string | undefined, currencyStr: string): boolean {
+  if (!symbol) return false;
+  const str = String(symbol).trim();
+  
+  // If currency indicates Agorot
+  if (currencyStr && (currencyStr.includes('אג') || currencyStr.toLowerCase().includes('agr'))) {
+    return true;
+  }
+  
+  // Israeli security numbers are typically 6-7 digits
+  // And NOT in our international ETF mapping
+  if (/^\d{6,7}$/.test(str) && !ETF_SYMBOL_MAPPING[str]) {
+    return true;
+  }
+  
+  return false;
 }
 
 /**
@@ -230,8 +260,20 @@ function parseRow(row: Record<string, unknown>): TransactionInput | null {
   const rawType = String(row.rawType || '').trim();
   const type = mapTransactionType(rawType);
   const rawName = String(row.name || '').trim();
-  const symbol = cleanSymbol(row.symbol as string, rawName);
-  const currency = parseCurrency(row.currency as string);
+  const rawSymbol = String(row.symbol || '').trim();
+  const symbol = cleanSymbol(rawSymbol, rawName);
+  
+  const currencyStr = String(row.currency || '').trim();
+  const { currency, isAgorot } = parseCurrency(currencyStr);
+  
+  // Check if this is an Israeli security (prices in Agorot)
+  const isIsraeli = isAgorot || isIsraeliSecurity(rawSymbol, currencyStr);
+  
+  // Parse price - convert from Agorot to Shekels if needed
+  let price = row.price ? Math.abs(Number(row.price)) : undefined;
+  if (price && isIsraeli) {
+    price = price / 100; // Convert Agorot to Shekels
+  }
   
   // For fee transactions, use the raw name; otherwise use cleaned name or symbol
   const name = type === 'fee' 
@@ -244,8 +286,8 @@ function parseRow(row: Record<string, unknown>): TransactionInput | null {
     symbol,
     name,
     quantity: row.quantity ? Math.abs(Number(row.quantity)) : undefined,
-    price: row.price ? Math.abs(Number(row.price)) : undefined,
-    currency,
+    price,
+    currency: isIsraeli ? 'ILS' : currency,
     commission: row.commission ? Math.abs(Number(row.commission)) : 0,
     additionalFees: row.additionalFees ? Math.abs(Number(row.additionalFees)) : 0,
     totalAmountUSD: row.totalAmountUSD ? Number(row.totalAmountUSD) : undefined,
