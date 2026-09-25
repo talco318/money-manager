@@ -46,20 +46,19 @@ export function PerformanceChart({ data, isLoading }: PerformanceChartProps) {
 
   return (
     <ResponsiveContainer width="100%" height={300}>
-      <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+      <LineChart data={data} margin={{ top: 10, right: 30, left: 10, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
         <XAxis 
           dataKey="date" 
-          tick={{ fill: '#9CA3AF', fontSize: 12 }}
+          tick={{ fill: '#9CA3AF', fontSize: 11 }}
           tickLine={{ stroke: '#4B5563' }}
           axisLine={{ stroke: '#4B5563' }}
         />
         <YAxis 
-          tick={{ fill: '#9CA3AF', fontSize: 12 }}
+          tick={{ fill: '#9CA3AF', fontSize: 11 }}
           tickLine={{ stroke: '#4B5563' }}
           axisLine={{ stroke: '#4B5563' }}
-          tickFormatter={(value) => `${value.toFixed(0)}%`}
-          domain={['dataMin - 5', 'dataMax + 5']}
+          tickFormatter={(value) => `\u200E${value >= 0 ? '+' : ''}${value.toFixed(0)}%`}
         />
         <Tooltip
           contentStyle={{
@@ -69,28 +68,31 @@ export function PerformanceChart({ data, isLoading }: PerformanceChartProps) {
             color: '#F9FAFB',
           }}
           formatter={(value, name) => [
-            `${Number(value).toFixed(2)}%`,
-            name === 'portfolio' ? 'התיק שלי' : 'S&P 500'
+            `\u200E${Number(value) >= 0 ? '+' : ''}${Number(value).toFixed(2)}%`,
+            name === 'portfolioReturn' ? 'התיק שלי' : 'S&P 500'
           ]}
           labelStyle={{ color: '#9CA3AF' }}
         />
         <Legend 
-          formatter={(value) => value === 'portfolio' ? 'התיק שלי' : 'S&P 500'}
+          formatter={(value) => value === 'portfolioReturn' ? 'התיק שלי' : 'מדד S&P 500'}
           wrapperStyle={{ paddingTop: '10px' }}
         />
         <Line 
           type="monotone" 
-          dataKey="portfolio" 
+          dataKey="portfolioReturn" 
+          name="portfolioReturn"
           stroke="#3B82F6" 
-          strokeWidth={2}
+          strokeWidth={2.5}
           dot={false}
           activeDot={{ r: 6, fill: '#3B82F6' }}
         />
         <Line 
           type="monotone" 
-          dataKey="sp500" 
+          dataKey="sp500Return" 
+          name="sp500Return"
           stroke="#10B981" 
           strokeWidth={2}
+          strokeDasharray="4 4"
           dot={false}
           activeDot={{ r: 6, fill: '#10B981' }}
         />

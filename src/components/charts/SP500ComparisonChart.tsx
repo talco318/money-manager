@@ -58,27 +58,39 @@ export function SP500ComparisonChart({ data, isLoading }: SP500ComparisonChartPr
       <div className="grid grid-cols-3 gap-4 mb-4">
         <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
           <p className="text-xs text-gray-500 dark:text-gray-400">התיק שלי</p>
-          <p className={`text-lg font-bold ${portfolioReturn >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {portfolioReturn >= 0 ? '+' : ''}{portfolioReturn.toFixed(2)}%
+          <p className={`text-lg font-bold font-mono ${portfolioReturn >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+            <span dir="ltr" className="inline-block">
+              {portfolioReturn >= 0 ? '+' : ''}{portfolioReturn.toFixed(2)}%
+            </span>
           </p>
         </div>
         <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
           <p className="text-xs text-gray-500 dark:text-gray-400">S&P 500</p>
-          <p className={`text-lg font-bold ${sp500Return >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {sp500Return >= 0 ? '+' : ''}{sp500Return.toFixed(2)}%
+          <p className={`text-lg font-bold font-mono ${sp500Return >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+            <span dir="ltr" className="inline-block">
+              {sp500Return >= 0 ? '+' : ''}{sp500Return.toFixed(2)}%
+            </span>
           </p>
         </div>
         <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
           <p className="text-xs text-gray-500 dark:text-gray-400">אלפא (הפרש)</p>
-          <p className={`text-lg font-bold ${alpha >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {alpha >= 0 ? '+' : ''}{alpha.toFixed(2)}%
+          <p className={`text-lg font-bold font-mono ${alpha >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+            <span dir="ltr" className="inline-block">
+              {alpha >= 0 ? '+' : ''}{alpha.toFixed(2)}%
+            </span>
           </p>
         </div>
       </div>
 
-      {/* Area Chart showing the difference */}
+      {/* Area Chart showing Alpha (excess return over S&P 500) */}
       <ResponsiveContainer width="100%" height={220}>
-        <AreaChart data={dataWithAlpha} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+        <AreaChart data={dataWithAlpha} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
+          <defs>
+            <linearGradient id="alphaGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={alpha >= 0 ? '#10B981' : '#EF4444'} stopOpacity={0.4} />
+              <stop offset="95%" stopColor={alpha >= 0 ? '#10B981' : '#EF4444'} stopOpacity={0.0} />
+            </linearGradient>
+          </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
           <XAxis 
             dataKey="date" 
@@ -91,7 +103,7 @@ export function SP500ComparisonChart({ data, isLoading }: SP500ComparisonChartPr
             tick={{ fill: '#9CA3AF', fontSize: 11 }}
             tickLine={{ stroke: '#4B5563' }}
             axisLine={{ stroke: '#4B5563' }}
-            tickFormatter={(value) => `${value.toFixed(0)}%`}
+            tickFormatter={(value) => `\u200E${value >= 0 ? '+' : ''}${value.toFixed(0)}%`}
           />
           <Tooltip
             contentStyle={{
@@ -102,28 +114,21 @@ export function SP500ComparisonChart({ data, isLoading }: SP500ComparisonChartPr
             }}
             formatter={(value, name) => {
               const labels: Record<string, string> = {
-                portfolioReturn: 'התיק שלי',
-                sp500Return: 'S&P 500',
-                alpha: 'אלפא',
+                portfolioReturn: 'תשואת התיק',
+                sp500Return: 'תשואת S&P 500',
+                alpha: 'אלפא (עודף תשואה)',
               };
-              return [`${Number(value).toFixed(2)}%`, labels[String(name)] || name];
+              const num = Number(value);
+              return [`\u200E${num >= 0 ? '+' : ''}${num.toFixed(2)}%`, labels[String(name)] || name];
             }}
           />
           <Area
             type="monotone"
-            dataKey="sp500Return"
-            stroke="#10B981"
-            fill="#10B981"
-            fillOpacity={0.2}
-            strokeWidth={2}
-          />
-          <Area
-            type="monotone"
-            dataKey="portfolioReturn"
-            stroke="#3B82F6"
-            fill="#3B82F6"
-            fillOpacity={0.3}
-            strokeWidth={2}
+            dataKey="alpha"
+            name="alpha"
+            stroke={alpha >= 0 ? '#10B981' : '#EF4444'}
+            fill="url(#alphaGradient)"
+            strokeWidth={2.5}
           />
         </AreaChart>
       </ResponsiveContainer>
