@@ -145,27 +145,41 @@ export async function GET(request: Request) {
 
         const assetBases = assetHistories.map(a => a.history[0]?.close || 0);
 
+        // Map each asset's historical prices by ISO date (YYYY-MM-DD) for fast lookup and forward-filling
+        const assetDateMaps = assetHistories.map(a => {
+          const map = new Map<string, number>();
+          for (const pt of a.history) {
+            map.set(new Date(pt.date).toISOString().slice(0, 10), pt.close);
+          }
+          return map;
+        });
+
+        // Track last known price for each asset (forward fill across holidays / different trading calendars)
+        const lastPrices = [...assetBases];
+
         const comparison = sp500Data.map(pt => {
           const ptTime = new Date(pt.date).toISOString().slice(0, 10);
           const spRet = ((pt.close - baseSp) / baseSp) * 100;
 
           let weightedReturn = 0;
-          let coveredWeight = 0;
+          let totalWeight = 0;
 
           for (let i = 0; i < assetHistories.length; i++) {
             const asset = assetHistories[i];
             const basePrice = assetBases[i];
-            if (basePrice > 0 && asset.history.length > 0) {
-              const match = asset.history.find(h => new Date(h.date).toISOString().slice(0, 10) === ptTime);
-              if (match) {
-                const ret = ((match.close - basePrice) / basePrice) * 100;
-                weightedReturn += ret * asset.weight;
-                coveredWeight += asset.weight;
+            if (basePrice > 0) {
+              const dayPrice = assetDateMaps[i].get(ptTime);
+              if (dayPrice !== undefined) {
+                lastPrices[i] = dayPrice;
               }
+              const currentPrice = lastPrices[i];
+              const ret = ((currentPrice - basePrice) / basePrice) * 100;
+              weightedReturn += ret * asset.weight;
+              totalWeight += asset.weight;
             }
           }
 
-          const portRet = coveredWeight > 0 ? (weightedReturn / coveredWeight) : spRet;
+          const portRet = totalWeight > 0 ? (weightedReturn / totalWeight) : spRet;
 
           return {
             date: pt.date,
