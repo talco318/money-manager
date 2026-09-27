@@ -24,16 +24,18 @@ export default function LoginPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (status === 'authenticated') {
-      router.push('/');
+      const callbackUrl = searchParams.get('callbackUrl') || '/';
+      router.push(callbackUrl);
     }
-  }, [status, router]);
+  }, [status, router, searchParams]);
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     setError('');
     
     try {
-      await signIn('google', { callbackUrl: '/' });
+      const callbackUrl = searchParams.get('callbackUrl') || '/';
+      await signIn('google', { callbackUrl });
     } catch (err) {
       setError('שגיאה בהתחברות');
       setIsLoading(false);

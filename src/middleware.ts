@@ -5,28 +5,32 @@ import { getToken } from 'next-auth/jwt';
 // Routes that don't require authentication
 const publicRoutes = ['/login'];
 
-// API routes that are part of NextAuth
+// API routes that are part of NextAuth (must be accessible for auth flow)
 const authApiRoutes = ['/api/auth'];
+
+// Static file extensions to allow
+const staticExtensions = ['.ico', '.png', '.jpg', '.jpeg', '.svg', '.css', '.js', '.woff', '.woff2'];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow NextAuth API routes
+  // Allow NextAuth API routes (required for login/logout flow)
   if (authApiRoutes.some(route => pathname.startsWith(route))) {
     return NextResponse.next();
   }
 
-  // Allow public routes
+  // Allow public routes (login page)
   if (publicRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))) {
     return NextResponse.next();
   }
 
-  // Allow static files and Next.js internals
-  if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/favicon') ||
-    pathname.includes('.') // static files
-  ) {
+  // Allow Next.js internals
+  if (pathname.startsWith('/_next')) {
+    return NextResponse.next();
+  }
+
+  // Allow only specific static file extensions (not all files with dots)
+  if (staticExtensions.some(ext => pathname.endsWith(ext))) {
     return NextResponse.next();
   }
 
@@ -37,7 +41,29 @@ export async function middleware(request: NextRequest) {
   });
 
   if (!token) {
-    // Redirect to login page
+    // For API routes, return 401 instead of redirect
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { error: 'Unauthorized', message: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+    
+    // For pages, redirect to login
+    const loginUrl = new URL('/login', request.url);
+    // Save the original URL to redirect back after login
+    loginUrl.searchParams.set('callbackUrl', pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Additional security: verify token has required fields
+  if (!token.email) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { error: 'Invalid session', message: 'Session is missing required data' },
+        { status: 401 }
+      );
+    }
     const loginUrl = new URL('/login', request.url);
     return NextResponse.redirect(loginUrl);
   }
