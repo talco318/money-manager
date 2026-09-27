@@ -40,10 +40,14 @@ export function usePortfolio(): UsePortfolioResult {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (showLoading = false) => {
     try {
-      setIsLoading(true);
+      // Only show loading state on initial load or manual refresh
+      if (showLoading || isInitialLoad) {
+        setIsLoading(true);
+      }
       setError(null);
 
       // Fetch holdings from database (with sync)
@@ -214,18 +218,24 @@ export function usePortfolio(): UsePortfolioResult {
       setError(err instanceof Error ? err.message : 'שגיאה בטעינת הנתונים');
     } finally {
       setIsLoading(false);
+      setIsInitialLoad(false);
     }
-  }, []);
+  }, [isInitialLoad]);
 
   useEffect(() => {
-    fetchData();
+    fetchData(true); // Initial load with loading state
     
-    // Auto-refresh every 60 seconds
+    // Auto-refresh every 60 seconds (silent, no loading indicator)
     const interval = setInterval(() => {
-      fetchData();
+      fetchData(false);
     }, 60000);
     
     return () => clearInterval(interval);
+  }, [fetchData]);
+
+  // Manual refresh should show loading
+  const refresh = useCallback(async () => {
+    await fetchData(true);
   }, [fetchData]);
 
   return {
@@ -234,7 +244,7 @@ export function usePortfolio(): UsePortfolioResult {
     usdIlsRate,
     isLoading,
     error,
-    refresh: fetchData,
+    refresh,
     lastUpdated,
   };
 }

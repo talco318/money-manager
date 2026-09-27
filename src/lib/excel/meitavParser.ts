@@ -76,8 +76,7 @@ const TRANSACTION_TYPE_MAPPING: Record<string, TransactionType> = {
 
 // Known ETF mappings (Only for actual ticker renames, never map Israeli funds to US tickers)
 const ETF_SYMBOL_MAPPING: Record<string, string> = {
-  // Cash/Currency
-  '99028': 'USD',       // דולר ארה"ב (USD cash position)
+  // Empty - don't map Israeli securities to US tickers
 };
 
 // Hebrew name to symbol mapping (fallback - only for actual US stocks/ETFs)
@@ -312,9 +311,10 @@ function shouldImportTransaction(row: Record<string, unknown>): boolean {
   // Skip transactions without meaningful data
   if (!rawType) return false;
 
-  // Currency exchange transactions (B USD/ILS, 99028)
+  // Skip currency exchange transactions (B USD/ILS, 99028)
   if (isCurrencyExchangeRow(rawType, name, rawSymbol)) {
-    return true;
+    console.log(`Skipping currency exchange: ${rawType} - ${name} - ${rawSymbol}`);
+    return false;
   }
 
   // Skip internal tax operations (tax shield, future tax, etc.)
@@ -324,17 +324,16 @@ function shouldImportTransaction(row: Record<string, unknown>): boolean {
       name.includes('מגן מס') || name.includes('מס ששולם')) {
     return false;
   }
+  
+  // Skip "הפקדה" (deposit) transactions - these are internal movements
+  if (rawType === 'הפקדה') {
+    console.log(`Skipping deposit: ${rawType} - ${name} - ${rawSymbol}`);
+    return false;
+  }
 
   // Skip bank deposit interest (פח"ק בבנק)
   if (name.includes('פח"ק בבנק') || name.includes('פחק בבנק')) {
     return false;
-  }
-
-  // Real cash movements (deposits, fees, interest)
-  if (rawType.includes('העברה מזומן') || rawType.includes('משיכת מזומן') || 
-      rawType.includes('דמי טיפול') || rawType.includes('דמי טפול') || 
-      rawType.includes('ריבית מזומן') || rawType === 'הפקדה' || rawType === 'משיכה') {
-    return true;
   }
 
   const symbol = cleanSymbol(rawSymbol, name);
