@@ -3,6 +3,18 @@ import GoogleProvider from 'next-auth/providers/google';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import prisma from '@/lib/prisma';
 
+// Extend the session user type
+declare module 'next-auth' {
+  interface Session {
+    user: {
+      id: string;
+      name?: string | null;
+      email?: string | null;
+      image?: string | null;
+    };
+  }
+}
+
 // Allowed email addresses (can be configured via env variable)
 const ALLOWED_EMAILS = process.env.ALLOWED_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || [];
 
@@ -19,7 +31,7 @@ const handler = NextAuth({
     error: '/login',
   },
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ user }) {
       // If no allowed emails configured, allow anyone
       if (ALLOWED_EMAILS.length === 0) {
         return true;

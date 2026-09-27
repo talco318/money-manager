@@ -11,7 +11,7 @@ const authApiRoutes = ['/api/auth'];
 // Static file extensions to allow
 const staticExtensions = ['.ico', '.png', '.jpg', '.jpeg', '.svg', '.css', '.js', '.woff', '.woff2'];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Allow NextAuth API routes (required for login/logout flow)
