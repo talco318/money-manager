@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { signIn, useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function LoginPage() {
+function LoginContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { data: session, status } = useSession();
+  const { status } = useSession();
 
   // Check for error from NextAuth
   useEffect(() => {
@@ -36,7 +36,7 @@ export default function LoginPage() {
     try {
       const callbackUrl = searchParams.get('callbackUrl') || '/';
       await signIn('google', { callbackUrl });
-    } catch (err) {
+    } catch {
       setError('שגיאה בהתחברות');
       setIsLoading(false);
     }
@@ -123,5 +123,21 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <LoginContent />
+    </Suspense>
   );
 }
