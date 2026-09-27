@@ -23,6 +23,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Allow login page (public)
+  if (pathname === '/login' || pathname.startsWith('/login/')) {
+    return NextResponse.next();
+  }
+
   // Check for NextAuth session token
   const token = await getToken({ 
     req: request, 
@@ -38,8 +43,8 @@ export async function proxy(request: NextRequest) {
       );
     }
     
-    // For pages, redirect to NextAuth's built-in sign in page
-    const signInUrl = new URL('/api/auth/signin', request.url);
+    // For pages, redirect to our custom login page
+    const signInUrl = new URL('/login', request.url);
     signInUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(signInUrl);
   }

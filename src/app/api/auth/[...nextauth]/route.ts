@@ -26,7 +26,10 @@ const handler = NextAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
   ],
-  // Use default pages - DO NOT customize to avoid callback URL issues
+  pages: {
+    signIn: '/login',
+    error: '/login',
+  },
   callbacks: {
     async signIn({ user }) {
       if (ALLOWED_EMAILS.length === 0) {
