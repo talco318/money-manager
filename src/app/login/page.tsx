@@ -25,7 +25,7 @@ function LoginContent() {
   useEffect(() => {
     if (status === 'authenticated') {
       const callbackUrl = searchParams.get('callbackUrl') || '/';
-      router.push(callbackUrl);
+      router.replace(callbackUrl);
     }
   }, [status, router, searchParams]);
 
@@ -35,7 +35,11 @@ function LoginContent() {
     
     try {
       const callbackUrl = searchParams.get('callbackUrl') || '/';
-      await signIn('google', { callbackUrl });
+      // Use redirect: true to let NextAuth handle the redirect
+      await signIn('google', { 
+        callbackUrl,
+        redirect: true 
+      });
     } catch {
       setError('שגיאה בהתחברות');
       setIsLoading(false);
@@ -47,6 +51,18 @@ function LoginContent() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  // If authenticated, show loading while redirecting
+  if (status === 'authenticated') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-white">מעביר אותך...</p>
+        </div>
       </div>
     );
   }
