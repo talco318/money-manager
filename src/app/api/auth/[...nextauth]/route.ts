@@ -26,26 +26,20 @@ const handler = NextAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
   ],
-  // Don't customize pages - use default NextAuth paths to avoid callback URL issues
+  // Use default pages - DO NOT customize to avoid callback URL issues
   callbacks: {
     async signIn({ user }) {
-      // If no allowed emails configured, allow anyone
       if (ALLOWED_EMAILS.length === 0) {
         return true;
       }
-      
-      // Check if user's email is in the allowed list
       const userEmail = user.email?.toLowerCase();
       if (userEmail && ALLOWED_EMAILS.includes(userEmail)) {
         return true;
       }
-      
-      // Deny access
       console.log(`Access denied for email: ${user.email}`);
       return false;
     },
     async session({ session, user }) {
-      // Add user id to session
       if (session.user) {
         session.user.id = user.id;
       }
@@ -54,7 +48,7 @@ const handler = NextAuth({
   },
   session: {
     strategy: 'database',
-    maxAge: 30 * 24 * 60 * 60, // 30 days (for "remember me")
+    maxAge: 30 * 24 * 60 * 60,
   },
 });
 
