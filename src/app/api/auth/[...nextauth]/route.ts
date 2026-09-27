@@ -24,17 +24,9 @@ const handler = NextAuth({
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/callback/google`,
-        },
-      },
     }),
   ],
-  pages: {
-    signIn: '/login',
-    error: '/login',
-  },
+  // Don't customize pages - use default NextAuth paths to avoid callback URL issues
   callbacks: {
     async signIn({ user }) {
       // If no allowed emails configured, allow anyone

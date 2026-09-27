@@ -49,11 +49,11 @@ export async function proxy(request: NextRequest) {
       );
     }
     
-    // For pages, redirect to login
-    const loginUrl = new URL('/login', request.url);
+    // For pages, redirect to NextAuth sign-in page
+    const signInUrl = new URL('/api/auth/signin', request.url);
     // Save the original URL to redirect back after login
-    loginUrl.searchParams.set('callbackUrl', pathname);
-    return NextResponse.redirect(loginUrl);
+    signInUrl.searchParams.set('callbackUrl', pathname);
+    return NextResponse.redirect(signInUrl);
   }
 
   // Additional security: verify token has required fields
@@ -64,8 +64,8 @@ export async function proxy(request: NextRequest) {
         { status: 401 }
       );
     }
-    const loginUrl = new URL('/login', request.url);
-    return NextResponse.redirect(loginUrl);
+    const signInUrl = new URL('/api/auth/signin', request.url);
+    return NextResponse.redirect(signInUrl);
   }
 
   return NextResponse.next();
