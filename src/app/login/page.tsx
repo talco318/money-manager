@@ -15,7 +15,9 @@ export default async function LoginPage({
   
   if (session) {
     // User is already logged in, redirect to callback URL or home
-    redirect(params.callbackUrl || '/');
+    const rawTarget = params.callbackUrl || '/';
+    const target = rawTarget.startsWith('/login') ? '/' : rawTarget;
+    redirect(target);
   }
 
   // User is not authenticated, show login page

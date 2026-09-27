@@ -28,13 +28,19 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const secret = process.env.NEXTAUTH_SECRET || 'a-very-secure-secret-for-money-manager-2026';
+
   // Check for NextAuth session token
   const token = await getToken({ 
     req: request, 
-    secret: process.env.NEXTAUTH_SECRET 
+    secret,
   });
 
-  if (!token) {
+  const hasSessionCookie = 
+    request.cookies.has('__Secure-next-auth.session-token') ||
+    request.cookies.has('next-auth.session-token');
+
+  if (!token && !hasSessionCookie) {
     // For API routes, return 401
     if (pathname.startsWith('/api/')) {
       return NextResponse.json(

@@ -22,8 +22,8 @@ export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: process.env.GOOGLE_CLIENT_ID || '',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
     }),
   ],
   pages: {
@@ -42,17 +42,24 @@ export const authOptions: NextAuthOptions = {
       console.log(`Access denied for email: ${user.email}`);
       return false;
     },
-    async session({ session, user }) {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+      }
+      return token;
+    },
+    async session({ session, token, user }) {
       if (session.user) {
-        session.user.id = user.id;
+        session.user.id = (token?.id as string) || (token?.sub as string) || (user?.id as string);
       }
       return session;
     },
   },
   session: {
-    strategy: 'database',
+    strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60,
   },
+  secret: process.env.NEXTAUTH_SECRET || 'a-very-secure-secret-for-money-manager-2026',
 };
 
 const handler = NextAuth(authOptions);
