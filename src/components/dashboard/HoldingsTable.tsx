@@ -66,19 +66,19 @@ export function HoldingsTable({ holdings, isLoading, usdIlsRate = 3.7, cashBalan
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-200 dark:border-gray-700">
-            <th className="text-right py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">נייר</th>
-            <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">סימבול</th>
-            <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">כמות</th>
-            <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">מחיר נוכחי</th>
-            <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">שינוי יומי</th>
-            <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">עלות ממוצעת</th>
-            <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">שווי נוכחי</th>
-            <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">שווי ב-₪</th>
-            <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">רווח/הפסד</th>
+          <tr className="border-b border-gray-100 dark:border-gray-700/60 text-xs font-semibold text-gray-400 dark:text-gray-400">
+            <th className="text-right py-3.5 px-4 font-semibold">נייר</th>
+            <th className="text-left py-3.5 px-4 font-semibold">סימבול</th>
+            <th className="text-left py-3.5 px-4 font-semibold">כמות</th>
+            <th className="text-left py-3.5 px-4 font-semibold">מחיר נוכחי</th>
+            <th className="text-left py-3.5 px-4 font-semibold">שינוי יומי</th>
+            <th className="text-left py-3.5 px-4 font-semibold">עלות ממוצעת</th>
+            <th className="text-left py-3.5 px-4 font-semibold">שווי נוכחי</th>
+            <th className="text-left py-3.5 px-4 font-semibold">שווי ב-₪</th>
+            <th className="text-left py-3.5 px-4 font-semibold">רווח/הפסד</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
           {holdings.map((holding, index) => {
             const isProfitable = (holding.pnl || 0) >= 0;
             const isDayPositive = (holding.dayChange || 0) >= 0;
@@ -87,12 +87,12 @@ export function HoldingsTable({ holdings, isLoading, usdIlsRate = 3.7, cashBalan
             return (
               <tr 
                 key={holding.id || index}
-                className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                className="hover:bg-gray-50/70 dark:hover:bg-gray-800/40 transition-colors"
               >
                 <td className="py-4 px-4">
                   <a 
                     href={`/stock/${holding.symbol}`}
-                    className="font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer block"
+                    className="font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer block"
                   >
                     {holding.name}
                   </a>
@@ -101,20 +101,20 @@ export function HoldingsTable({ holdings, isLoading, usdIlsRate = 3.7, cashBalan
                   <div className="flex flex-col items-start gap-1">
                     <a 
                       href={`/stock/${holding.symbol}`}
-                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+                      className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                     >
                       {holding.symbol}
                     </a>
                     {holding.hasLiveQuote ? (
                       <span 
-                        className="inline-flex items-center gap-1 text-[11px] text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/40 px-1.5 py-0.5 rounded border border-green-200 dark:border-green-800"
+                        className="inline-flex items-center gap-1 text-[11px] text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/40 px-1.5 py-0.5 rounded-md border border-green-200/60 dark:border-green-800"
                         title="ציטוט חי מעודכן מ-Yahoo Finance"
                       >
                         🟢 ציטוט חי
                       </span>
                     ) : (
                       <span 
-                        className="inline-flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800"
+                        className="inline-flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded-md border border-amber-200/60 dark:border-amber-800"
                         title="אין ציטוט חי מבורסת תל אביב - המחיר מעודכן לפי העסקה האחרונה בדוח"
                       >
                         ⏱️ מחיר מעסקה
@@ -122,19 +122,19 @@ export function HoldingsTable({ holdings, isLoading, usdIlsRate = 3.7, cashBalan
                     )}
                   </div>
                 </td>
-                <td className="py-4 px-4 text-gray-700 dark:text-gray-300">
+                <td className="py-4 px-4 text-gray-700 dark:text-gray-300 font-medium">
                   {formatNumber(holding.quantity, holding.quantity % 1 === 0 ? 0 : 4)}
                 </td>
-                <td className="py-4 px-4 font-medium text-gray-900 dark:text-white">
+                <td className="py-4 px-4 font-semibold text-gray-900 dark:text-white">
                   {formatCurrency(holding.currentPrice || 0, currency)}
                 </td>
                 <td className="py-4 px-4">
                   {holding.hasLiveQuote ? (
-                    <div className={`flex flex-col ${isDayPositive ? 'text-green-600' : 'text-red-600'}`}>
-                      <span className="font-medium">
+                    <div className={`flex flex-col ${isDayPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                      <span className="font-semibold">
                         {isDayPositive ? '+' : ''}{formatCurrency(holding.dayChange || 0, currency)}
                       </span>
-                      <span className="text-xs">
+                      <span className="text-xs font-medium">
                         {formatPercent(holding.dayChangePercent || 0)}
                       </span>
                     </div>
@@ -144,21 +144,25 @@ export function HoldingsTable({ holdings, isLoading, usdIlsRate = 3.7, cashBalan
                     </span>
                   )}
                 </td>
-                <td className="py-4 px-4 text-gray-700 dark:text-gray-300">
+                <td className="py-4 px-4 text-gray-600 dark:text-gray-300">
                   {formatCurrency(holding.avgPrice, currency)}
                 </td>
-                <td className="py-4 px-4 font-medium text-gray-900 dark:text-white">
+                <td className="py-4 px-4 font-semibold text-gray-900 dark:text-white">
                   {formatCurrency(holding.currentValue || 0, currency)}
                 </td>
-                <td className="py-4 px-4 font-semibold text-gray-800 dark:text-gray-200">
+                <td className="py-4 px-4 font-bold text-gray-900 dark:text-white">
                   {formatNumber(holding.currentValueILS || 0, 0)} ₪
                 </td>
                 <td className="py-4 px-4">
-                  <div className={`flex flex-col ${isProfitable ? 'text-green-600' : 'text-red-600'}`}>
-                    <span className="font-medium">
+                  <div className={`inline-flex flex-col px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                    isProfitable 
+                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/40' 
+                      : 'bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40'
+                  }`}>
+                    <span className="font-bold">
                       {isProfitable ? '+' : ''}{formatCurrency(holding.pnl || 0, currency)}
                     </span>
-                    <span className="text-xs">
+                    <span className="text-[10px] opacity-80">
                       {formatPercent(holding.pnlPercent || 0)}
                     </span>
                   </div>

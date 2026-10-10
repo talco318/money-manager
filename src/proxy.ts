@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import { getToken, decode } from 'next-auth/jwt';
 
 // Static file extensions to allow
 const staticExtensions = ['.ico', '.png', '.jpg', '.jpeg', '.svg', '.css', '.js', '.woff', '.woff2'];
@@ -30,15 +30,28 @@ export async function proxy(request: NextRequest) {
 
   const secret = process.env.NEXTAUTH_SECRET || 'a-very-secure-secret-for-money-manager-2026';
 
+  // Custom decode function to resolve NextAuth v4 Vercel salt bug where secureCookie salt is not passed to decode
+  const customDecode = async (params: { token?: string; secret: string | Buffer }) => {
+    if (!params.token) return null;
+    return (
+      (await decode({ token: params.token, secret: params.secret, salt: '__Secure-next-auth.session-token' }).catch(() => null)) ||
+      (await decode({ token: params.token, secret: params.secret, salt: 'next-auth.session-token' }).catch(() => null)) ||
+      (await decode({ token: params.token, secret: params.secret, salt: '' }).catch(() => null))
+    );
+  };
+
   // Check for NextAuth session token
   const token = await getToken({ 
     req: request, 
     secret,
+    decode: customDecode,
   });
 
   const hasSessionCookie = 
     request.cookies.has('__Secure-next-auth.session-token') ||
-    request.cookies.has('next-auth.session-token');
+    request.cookies.has('next-auth.session-token') ||
+    request.cookies.has('__Secure-next-auth.session-token.0') ||
+    request.cookies.has('next-auth.session-token.0');
 
   if (!token && !hasSessionCookie) {
     // For API routes, return 401

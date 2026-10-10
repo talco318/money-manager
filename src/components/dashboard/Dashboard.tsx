@@ -97,22 +97,22 @@ export function Dashboard() {
         />
       </div>
 
-      {/* Cash Balances Section - Styled like Meitav Trade */}
-      <div className="bg-gradient-to-r from-blue-900/15 via-indigo-900/15 to-purple-900/15 dark:from-blue-950/40 dark:via-indigo-950/40 dark:to-purple-950/40 border border-blue-200/60 dark:border-blue-800/40 rounded-xl p-5 shadow-xs">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      {/* Cash Balances Section - Styled with Figma Card Aesthetic */}
+      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-xs border border-gray-100 dark:border-gray-700/60">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <span className="text-xl">💳</span>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">יתרות מזומן בחשבון (מיטב טרייד)</h2>
+              <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">יתרות מזומן בחשבון (מיטב טרייד)</h2>
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               יתרות המזומן הזמינות לפעילות, משוקללות בתוך שווי התיק הכולל
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             {/* ILS Cash */}
-            <div className="bg-white/90 dark:bg-gray-800/90 rounded-lg p-3 border border-gray-200/60 dark:border-gray-700">
+            <div className="bg-[#f8fafc] dark:bg-gray-700/40 rounded-2xl p-4 border border-gray-100 dark:border-gray-700/60">
               <span className="text-xs text-gray-500 dark:text-gray-400 font-medium block mb-1">
                 🇮🇱 יתרה שקלית (עו"ש)
               </span>
@@ -125,7 +125,7 @@ export function Dashboard() {
             </div>
 
             {/* USD Cash */}
-            <div className="bg-white/90 dark:bg-gray-800/90 rounded-lg p-3 border border-gray-200/60 dark:border-gray-700">
+            <div className="bg-[#f8fafc] dark:bg-gray-700/40 rounded-2xl p-4 border border-gray-100 dark:border-gray-700/60">
               <span className="text-xs text-gray-500 dark:text-gray-400 font-medium block mb-1">
                 🇺🇸 יתרה דולרית (נייר 99028)
               </span>
@@ -138,7 +138,7 @@ export function Dashboard() {
             </div>
 
             {/* Total Cash in ILS */}
-            <div className="bg-white/90 dark:bg-gray-800/90 rounded-lg p-3 border border-blue-300 dark:border-blue-700/60">
+            <div className="bg-[#eff6ff] dark:bg-blue-950/30 rounded-2xl p-4 border border-blue-100 dark:border-blue-800/40">
               <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold block mb-1">
                 💰 סה&quot;כ מזומן משוקלל
               </span>
@@ -154,9 +154,9 @@ export function Dashboard() {
       </div>
 
       {/* Exchange Rate Info */}
-      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+      <div className="inline-flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 px-4 py-2 rounded-2xl border border-gray-100 dark:border-gray-700/60 shadow-xs">
         <span>שער USD/ILS:</span>
-        <span className="font-medium text-gray-700 dark:text-gray-300">
+        <span className="font-bold text-gray-900 dark:text-white">
           {usdIlsRate.toFixed(4)} ₪
         </span>
       </div>
@@ -189,34 +189,40 @@ export function Dashboard() {
       </Card>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="hover:border-blue-300 dark:hover:border-blue-600 transition-colors cursor-pointer">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-xs border border-gray-100 dark:border-gray-700/60 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer">
           <a href="/import" className="block text-center">
-            <span className="text-4xl block mb-2">📤</span>
-            <h3 className="font-semibold text-gray-900 dark:text-white">ייבוא עסקאות</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <span className="w-12 h-12 mx-auto rounded-2xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center text-2xl mb-3">
+              📤
+            </span>
+            <h3 className="font-bold text-gray-900 dark:text-white">ייבוא עסקאות</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               העלה קובץ אקסל ממיטב טרייד
             </p>
           </a>
-        </Card>
-        <Card className="hover:border-blue-300 dark:hover:border-blue-600 transition-colors cursor-pointer">
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-xs border border-gray-100 dark:border-gray-700/60 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer">
           <a href="/import?tab=manual" className="block text-center">
-            <span className="text-4xl block mb-2">📝</span>
-            <h3 className="font-semibold text-gray-900 dark:text-white">הוסף עסקה</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <span className="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center text-2xl mb-3">
+              📝
+            </span>
+            <h3 className="font-bold text-gray-900 dark:text-white">הוסף עסקה</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               הוספת עסקה ידנית לתיק
             </p>
           </a>
-        </Card>
-        <Card className="hover:border-blue-300 dark:hover:border-blue-600 transition-colors cursor-pointer">
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-xs border border-gray-100 dark:border-gray-700/60 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer">
           <a href="/charts" className="block text-center">
-            <span className="text-4xl block mb-2">📈</span>
-            <h3 className="font-semibold text-gray-900 dark:text-white">צפה בגרפים</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <span className="w-12 h-12 mx-auto rounded-2xl bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center text-2xl mb-3">
+              📈
+            </span>
+            <h3 className="font-bold text-gray-900 dark:text-white">צפה בגרפים</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               ביצועי תיק והשוואה למדדים
             </p>
           </a>
-        </Card>
+        </div>
       </div>
     </div>
   );
