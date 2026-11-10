@@ -5,6 +5,7 @@ import { TransactionInput, TransactionType, ImportResult } from '@/types';
 const COLUMN_MAPPING: Record<string, string> = {
   'תאריך': 'date',
   'סוג פעולה': 'rawType',
+  'פעולה': 'rawType',
   'שם נייר': 'name',
   "מס' נייר / סימבול": 'symbol',
   "מס' נייר": 'symbol',
@@ -16,9 +17,46 @@ const COLUMN_MAPPING: Record<string, string> = {
   'עמלת פעולה': 'commission',
   'עמלות נלוות': 'additionalFees',
   'תמורה במט"ח': 'totalAmountUSD',
+  'תמורה במט״ח': 'totalAmountUSD',
   'תמורה בשקלים': 'totalAmountILS',
   'יתרה שקלית': 'cashBalance',
   'אומדן מס רווחי הון': 'taxEstimate',
+};
+
+// Meitav domestic security IDs for foreign securities (US stocks/ETFs)
+const US_SECURITY_IDS: Record<string, string> = {
+  '60354768': 'GOOG',
+  '60032877': 'GOOGL',
+  '60606209': 'META',
+  '20001739': 'MDB',
+  '60559242': 'WGMI',
+  '20001058': 'UBER',
+  '60505583': 'FROG',
+  '119636': 'NVDA',
+  '119602': 'TXN',
+  '1051424': 'JPM',
+  '112243': 'QQQ',
+  '102368': 'PFE',
+  '105049': 'MSFT',
+  '108092': 'AMZN',
+  '113803': 'AKAM',
+};
+
+// Fallback mapping by company name for foreign stocks
+const US_NAME_TO_SYMBOL: Record<string, string> = {
+  'alphabet': 'GOOGL',
+  'meta platforms': 'META',
+  'mongodb': 'MDB',
+  'coinshares': 'WGMI',
+  'uber': 'UBER',
+  'jfrog': 'FROG',
+  'amazon': 'AMZN',
+  'אמאזון': 'AMZN',
+  'microsoft': 'MSFT',
+  'nvidia': 'NVDA',
+  'pfizer': 'PFE',
+  'jpmorgan': 'JPM',
+  'j.p. morgan': 'JPM',
 };
 
 // Transaction type mapping from Hebrew
@@ -88,10 +126,11 @@ const ISRAELI_SECURITY_MAPPING: Record<string, string> = {
 };
 
 /**
- * Parse date from DD/MM/YYYY format
+ * Parse date from DD/MM/YYYY format or Excel serial
  */
-function parseDate(dateStr: string): Date | null {
+function parseDate(dateStr: string | number | Date): Date | null {
   if (!dateStr) return null;
+  if (dateStr instanceof Date) return dateStr;
   
   // Handle Excel serial date numbers
   if (typeof dateStr === 'number') {
@@ -99,13 +138,14 @@ function parseDate(dateStr: string): Date | null {
     return new Date(date.y, date.m - 1, date.d);
   }
   
-  // Handle string date DD/MM/YYYY
-  const parts = String(dateStr).split('/');
+  // Handle string date DD/MM/YYYY, DD-MM-YYYY, or DD.MM.YYYY
+  const parts = String(dateStr).trim().split(/[/.-]/);
   if (parts.length !== 3) return null;
   
   const day = parseInt(parts[0], 10);
   const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
-  const year = parseInt(parts[2], 10);
+  let year = parseInt(parts[2], 10);
+  if (year < 100) year += 2000;
   
   return new Date(year, month, day);
 }
@@ -211,27 +251,58 @@ function isIsraeliSecurityInAgorot(
 }
 
 /**
- * Clean symbol - remove extra characters and map ETFs
+ * Clean symbol - remove extra characters and map ETFs and US stocks
  */
-function cleanSymbol(symbol: string | undefined, name?: string): string | undefined {
+function cleanSymbol(symbol: string | undefined, name?: string, rawType?: string, currencyStr?: string): string | undefined {
   if (!symbol && !name) return undefined;
   
-  const str = String(symbol || '').trim();
+  let str = String(symbol || '').trim();
   
-  // Skip empty symbols
-  if (!str) return undefined;
-  
+  // Clean up common symbol formats
+  str = str.replace(/\.US$/i, '').replace(/\.NYSE$/i, '').replace(/\.NASDAQ$/i, '').replace(/\s+/g, '');
+
+  // Check if it's a known US security by Meitav domestic security ID (e.g. 60354768 -> GOOG)
+  if (str && US_SECURITY_IDS[str]) {
+    return US_SECURITY_IDS[str];
+  }
+
   // Check if it's a known international ETF by Israeli trading number
-  if (ETF_SYMBOL_MAPPING[str]) {
+  if (str && ETF_SYMBOL_MAPPING[str]) {
     return ETF_SYMBOL_MAPPING[str];
   }
   
   // Check if it's a known Israeli security
-  if (ISRAELI_SECURITY_MAPPING[str]) {
+  if (str && ISRAELI_SECURITY_MAPPING[str]) {
     return ISRAELI_SECURITY_MAPPING[str];
   }
-  
-  // Try to match by Hebrew name
+
+  const isForeign = (currencyStr && currencyStr.includes('$')) || (rawType && (rawType.includes('חול') || rawType.includes('מטח')));
+
+  // If foreign trade, look for US ticker inside parentheses in name: e.g. "NVIDIA(NVDA)" or "TEXAS INSTR(TXN" or "PFIZER (PFE)"
+  if (isForeign && name) {
+    const parenMatch = name.match(/\(([A-Z]{1,5})\b/i);
+    if (parenMatch) {
+      return parenMatch[1].toUpperCase();
+    }
+
+    const trailingMatch = name.match(/\b([A-Z]{2,5})(\s+US)?$/i);
+    if (trailingMatch) {
+      const ticker = trailingMatch[1].toUpperCase();
+      if (!['US', 'ETF', 'INC', 'LTD', 'CORP', 'CO'].includes(ticker)) {
+        return ticker;
+      }
+    }
+
+    // Try to match by Hebrew / English name
+    const normalizedName = String(name).toLowerCase().trim();
+    for (const [keyName, yahooSymbol] of Object.entries(US_NAME_TO_SYMBOL)) {
+      if (normalizedName.includes(keyName)) {
+        return yahooSymbol;
+      }
+    }
+  }
+
+  // Try to match by Hebrew name in ETF_NAME_MAPPING
   if (name) {
     const normalizedName = String(name).toLowerCase().trim();
     for (const [hebrewName, yahooSymbol] of Object.entries(ETF_NAME_MAPPING)) {
@@ -244,24 +315,13 @@ function cleanSymbol(symbol: string | undefined, name?: string): string | undefi
   // If it's a pure number (Israeli security number)
   if (/^\d+$/.test(str)) {
     // Keep as-is - it's an Israeli security we haven't mapped
-    // It will be stored and can be manually mapped later
     if (str.length >= 5 && str.length <= 8) {
-      console.log(`Unmapped Israeli security: ${str}, name: ${name}`);
       return str; // Keep the number as symbol
     }
     return undefined;
   }
   
-  // Clean up common symbol formats
-  let cleaned = str.toUpperCase();
-  
-  // Remove common suffixes that Yahoo Finance doesn't use
-  cleaned = cleaned.replace(/\.US$/, '');
-  cleaned = cleaned.replace(/\.NYSE$/, '');
-  cleaned = cleaned.replace(/\.NASDAQ$/, '');
-  cleaned = cleaned.replace(/\s+/g, '');
-  
-  return cleaned;
+  return str ? str.toUpperCase() : undefined;
 }
 
 /**
@@ -335,7 +395,8 @@ function shouldImportTransaction(row: Record<string, unknown>): boolean {
     return false;
   }
 
-  const symbol = cleanSymbol(rawSymbol, name);
+  const currencyStr = String(row.currency || '').trim();
+  const symbol = cleanSymbol(rawSymbol, name, rawType, currencyStr);
   const type = mapTransactionType(rawType);
   
   // Always import splits, capital reductions, and stock dividends if they have a symbol
@@ -401,9 +462,8 @@ function parseRow(row: Record<string, unknown>): TransactionInput | null {
   if (type === 'deposit' && ((rawTotalILS !== undefined && rawTotalILS < 0) || rawName.includes('העברה ל:'))) {
     type = 'withdrawal';
   }
-  const symbol = cleanSymbol(rawSymbol, rawName);
-  
   const currencyStr = String(row.currency || '').trim();
+  const symbol = cleanSymbol(rawSymbol, rawName, rawType, currencyStr);
   const { currency, isAgorot } = parseCurrency(currencyStr);
   
   // Parse raw price first
@@ -489,12 +549,82 @@ export function parseExcelFile(buffer: ArrayBuffer): ImportResult {
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
     
-    // Convert to JSON
-    const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
-    result.totalRows = rawRows.length;
-    
-    // Transform column names
-    const rows = transformColumns(rawRows);
+    // Read raw 2D array to dynamically find header row index (handles metadata / leading empty rows)
+    const raw2D = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 });
+
+    const knownHeaderSamples = [
+      'תאריך', 'שם נייר', 'פעולה', 'סוג פעולה', 'כמות', 
+      'שער ביצוע', 'תמורה בשקלים', 'יתרה שקלית', 'עמלת פעולה', 'מטבע'
+    ];
+
+    let headerRowIndex = -1;
+    for (let i = 0; i < Math.min(25, raw2D.length); i++) {
+      const row = raw2D[i];
+      if (!Array.isArray(row)) continue;
+      let matches = 0;
+      for (const cell of row) {
+        if (typeof cell === 'string') {
+          const trimmed = cell.trim().replace(/[״״]/g, '"');
+          if (knownHeaderSamples.includes(trimmed)) {
+            matches++;
+          }
+        }
+      }
+      if (matches >= 3) {
+        headerRowIndex = i;
+        break;
+      }
+    }
+
+    if (headerRowIndex === -1) {
+      throw new Error('לא נמצאה שורת כותרות תקינה בקובץ האקסל');
+    }
+
+    const rawHeaders = raw2D[headerRowIndex] as unknown[];
+    const headers = rawHeaders.map(h => typeof h === 'string' ? h.trim().replace(/[״״]/g, '"') : '');
+    const dataRows = raw2D.slice(headerRowIndex + 1);
+    result.totalRows = dataRows.length;
+
+    // Transform rows to standard structure
+    const rows: Record<string, unknown>[] = [];
+    for (const r of dataRows) {
+      if (!Array.isArray(r) || r.length === 0) continue;
+      const transformed: Record<string, unknown> = {};
+      let hasData = false;
+
+      headers.forEach((h, colIdx) => {
+        if (!h || r[colIdx] === undefined || r[colIdx] === '') return;
+        const englishKey = COLUMN_MAPPING[h];
+        if (englishKey) {
+          transformed[englishKey] = r[colIdx];
+          hasData = true;
+        }
+      });
+
+      if (!hasData) continue;
+
+      // Extract symbol and name if name is in "Name, Symbol" format and symbol is missing
+      let rawName = transformed.name ? String(transformed.name).trim() : '';
+      let rawSymbol = transformed.symbol ? String(transformed.symbol).trim() : undefined;
+
+      if (!rawSymbol && rawName.includes(',')) {
+        const lastCommaIdx = rawName.lastIndexOf(',');
+        const potentialSymbol = rawName.slice(lastCommaIdx + 1).trim();
+        const potentialName = rawName.slice(0, lastCommaIdx).trim();
+
+        if (/^\d+$/.test(potentialSymbol)) {
+          rawSymbol = potentialSymbol;
+          rawName = potentialName;
+        }
+      }
+
+      transformed.name = rawName;
+      if (rawSymbol) {
+        transformed.symbol = rawSymbol;
+      }
+
+      rows.push(transformed);
+    }
     
     // Parse each row in chronological order (Meitav exports newest at top, so reverse to process oldest first)
     for (let i = rows.length - 1; i >= 0; i--) {
