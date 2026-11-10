@@ -478,27 +478,24 @@ export async function calculateDeposits(): Promise<{
 /**
  * Get portfolio summary statistics
  */
-export async function getPortfolioStats() {
-  const holdings = await prisma.holding.findMany();
-  
+export async function getPortfolioStats(existingHoldings?: Array<{ totalCost: number }>) {
+  const [commissions, dividends, deposits, holdings] = await Promise.all([
+    prisma.transaction.aggregate({
+      _sum: { commission: true, additionalFees: true },
+    }),
+    prisma.transaction.aggregate({
+      where: { type: 'dividend' },
+      _sum: { totalAmountUSD: true },
+    }),
+    calculateDeposits(),
+    existingHoldings ? Promise.resolve(existingHoldings) : prisma.holding.findMany(),
+  ]);
+
   const totalCost = holdings.reduce((sum, h) => sum + h.totalCost, 0);
   const totalHoldings = holdings.length;
-  
-  // Get total commissions paid
-  const commissions = await prisma.transaction.aggregate({
-    _sum: { commission: true, additionalFees: true },
-  });
 
   const totalCommissions = (commissions._sum.commission || 0) + (commissions._sum.additionalFees || 0);
-
-  // Get total dividends received
-  const dividends = await prisma.transaction.aggregate({
-    where: { type: 'dividend' },
-    _sum: { totalAmountUSD: true },
-  });
-
   const totalDividends = Math.abs(dividends._sum.totalAmountUSD || 0);
-  const deposits = await calculateDeposits();
 
   return {
     totalCost,

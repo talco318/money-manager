@@ -8,19 +8,21 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const refresh = searchParams.get('refresh') === 'true';
 
-    // Recalculate holdings if requested
+    // Recalculate holdings only if explicitly requested (e.g. manual refresh)
     if (refresh) {
       await syncHoldings();
     }
 
-    // Fetch holdings
-    const holdings = await prisma.holding.findMany({
-      orderBy: { symbol: 'asc' },
-    });
+    // Fetch holdings and cash balance in parallel
+    const [holdings, cashBalance] = await Promise.all([
+      prisma.holding.findMany({
+        orderBy: { symbol: 'asc' },
+      }),
+      calculateCashBalance(),
+    ]);
 
-    // Get portfolio stats and cash balances
-    const stats = await getPortfolioStats();
-    const cashBalance = await calculateCashBalance();
+    // Get portfolio stats and deposits (reusing fetched holdings)
+    const stats = await getPortfolioStats(holdings);
 
     return NextResponse.json({
       success: true,

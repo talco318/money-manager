@@ -33,6 +33,8 @@ interface UsePortfolioResult {
   lastUpdated: Date | null;
 }
 
+const CACHE_KEY = 'mm_portfolio_cache_v2';
+
 export function usePortfolio(): UsePortfolioResult {
   const [holdings, setHoldings] = useState<HoldingWithMarketData[]>([]);
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
@@ -40,31 +42,35 @@ export function usePortfolio(): UsePortfolioResult {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  const fetchData = useCallback(async (showLoading = false) => {
+  const fetchData = useCallback(async (manualRefresh = false) => {
     try {
-      // Only show loading state on initial load or manual refresh
-      if (showLoading || isInitialLoad) {
+      if (manualRefresh) {
         setIsLoading(true);
       }
       setError(null);
 
-      // Fetch holdings from database (with sync)
-      const holdingsRes = await fetch('/api/holdings?refresh=true');
-      const holdingsData = await holdingsRes.json();
+      // Fetch holdings and USD/ILS rate in parallel.
+      // Only trigger deep FIFO recalculation on explicit manual refresh.
+      const holdingsUrl = manualRefresh ? '/api/holdings?refresh=true' : '/api/holdings';
+      const [holdingsRes, rateRes] = await Promise.all([
+        fetch(holdingsUrl),
+        fetch('/api/market?type=usdils')
+      ]);
+
+      const [holdingsData, rateData] = await Promise.all([
+        holdingsRes.json(),
+        rateRes.json()
+      ]);
 
       if (!holdingsData.success) {
         throw new Error(holdingsData.error || 'Failed to fetch holdings');
       }
 
-      const dbHoldings: HoldingFromAPI[] = holdingsData.data.holdings || [];
-
-      // Fetch USD/ILS rate
-      const rateRes = await fetch('/api/market?type=usdils');
-      const rateData = await rateRes.json();
       const rate = rateData.success ? rateData.data.rate : 3.7;
       setUsdIlsRate(rate);
+
+      const dbHoldings: HoldingFromAPI[] = holdingsData.data.holdings || [];
 
       if (dbHoldings.length === 0) {
         // No holdings, set empty state
@@ -77,7 +83,7 @@ export function usePortfolio(): UsePortfolioResult {
         const emptyTotalWithdrawalsILS = holdingsData.data.deposits?.totalWithdrawalsILS || 0;
         const emptyPnLILS = emptyNetDepositsILS > 0 ? emptyTotalCashILS - emptyNetDepositsILS : 0;
         const emptyPnLPercent = emptyNetDepositsILS > 0 ? (emptyPnLILS / emptyNetDepositsILS) * 100 : 0;
-        setSummary({
+        const emptySummary: PortfolioSummary = {
           totalValue: rate > 0 ? emptyTotalCashILS / rate : 0,
           totalValueILS: emptyTotalCashILS,
           totalCost: 0,
@@ -96,7 +102,8 @@ export function usePortfolio(): UsePortfolioResult {
           cashBalanceUSD: emptyCashUSD,
           totalCashILS: emptyTotalCashILS,
           holdings: [],
-        });
+        };
+        setSummary(emptySummary);
         setIsLoading(false);
         setLastUpdated(new Date());
         return;
@@ -222,8 +229,7 @@ export function usePortfolio(): UsePortfolioResult {
         ? (totalSecuritiesDayChangeILS / (totalSecuritiesValueILS - totalSecuritiesDayChangeILS)) * 100 
         : 0;
 
-      setHoldings(enrichedHoldings);
-      setSummary({
+      const newSummary: PortfolioSummary = {
         totalValue: portfolioTotalValueUSD,
         totalValueILS: portfolioTotalValueILS,
         totalCost: rate > 0 ? totalSecuritiesCostILS / rate : 0,
@@ -242,19 +248,51 @@ export function usePortfolio(): UsePortfolioResult {
         cashBalanceUSD: cashUSD,
         totalCashILS,
         holdings: enrichedHoldings,
-      });
+      };
+
+      setHoldings(enrichedHoldings);
+      setSummary(newSummary);
       setLastUpdated(new Date());
+
+      // Cache locally for instant next page load
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({
+          holdings: enrichedHoldings,
+          summary: newSummary,
+          usdIlsRate: rate,
+          timestamp: Date.now(),
+        }));
+      } catch {
+        // Ignore localStorage quota errors
+      }
     } catch (err) {
       console.error('Error fetching portfolio:', err);
       setError(err instanceof Error ? err.message : 'שגיאה בטעינת הנתונים');
     } finally {
       setIsLoading(false);
-      setIsInitialLoad(false);
     }
-  }, [isInitialLoad]);
+  }, []);
 
   useEffect(() => {
-    fetchData(true); // Initial load with loading state
+    // 1. Instant hydration from localStorage cache
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.holdings && parsed.summary) {
+          setHoldings(parsed.holdings);
+          setSummary(parsed.summary);
+          if (parsed.usdIlsRate) setUsdIlsRate(parsed.usdIlsRate);
+          if (parsed.timestamp) setLastUpdated(new Date(parsed.timestamp));
+          setIsLoading(false);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load portfolio cache:', e);
+    }
+
+    // 2. Fresh background fetch (fast, without heavy FIFO recalculation)
+    fetchData(false);
     
     // Auto-refresh every 60 seconds (silent, no loading indicator)
     const interval = setInterval(() => {
@@ -264,7 +302,7 @@ export function usePortfolio(): UsePortfolioResult {
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  // Manual refresh should show loading
+  // Manual refresh should trigger deep sync & show loading
   const refresh = useCallback(async () => {
     await fetchData(true);
   }, [fetchData]);

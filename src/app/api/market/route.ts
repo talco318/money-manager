@@ -41,6 +41,10 @@ export async function GET(request: Request) {
           return NextResponse.json({
             success: true,
             data: quotesArray,
+          }, {
+            headers: {
+              'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+            },
           });
         } else if (symbol) {
           // Single symbol
@@ -334,6 +338,10 @@ export async function GET(request: Request) {
           data: {
             history: comparison,
           },
+        }, {
+          headers: {
+            'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+          },
         });
       }
 
@@ -346,6 +354,10 @@ export async function GET(request: Request) {
             pair: 'USD/ILS',
             rate,
             lastUpdated: new Date().toISOString(),
+          },
+        }, {
+          headers: {
+            'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
           },
         });
       }

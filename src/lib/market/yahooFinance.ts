@@ -59,7 +59,7 @@ const ISRAELI_FALLBACK_PRICES: Record<string, { price: number; name?: string }> 
 /**
  * Get real-time quote for a single symbol
  */
-export async function getQuote(symbol: string): Promise<QuoteData | null> {
+export async function getQuote(symbol: string, knownRate?: number): Promise<QuoteData | null> {
   try {
     // Check cache first
     const cached = cache.get(symbol);
@@ -103,10 +103,10 @@ export async function getQuote(symbol: string): Promise<QuoteData | null> {
     let currency = quote.currency || 'USD';
 
     const mult = proxy?.multiplier ?? 1;
+    const rate = proxy?.inUSD ? (knownRate ?? (await getUsdIlsRate())) : 1;
 
     // If this is an Israeli fund mapped to an international USD UCITS ETF, convert to ILS
     if (proxy && proxy.inUSD) {
-      const rate = await getUsdIlsRate();
       price = Number((price * rate * mult).toFixed(2));
       change = Number((change * rate * mult).toFixed(2));
       previousClose = Number((previousClose * rate * mult).toFixed(2));
@@ -124,8 +124,8 @@ export async function getQuote(symbol: string): Promise<QuoteData | null> {
       change,
       changePercent: quote.regularMarketChangePercent || 0,
       previousClose,
-      dayHigh: quote.regularMarketDayHigh ? (proxy?.inUSD ? Number((quote.regularMarketDayHigh * (await getUsdIlsRate()) * mult).toFixed(2)) : quote.regularMarketDayHigh * mult) : undefined,
-      dayLow: quote.regularMarketDayLow ? (proxy?.inUSD ? Number((quote.regularMarketDayLow * (await getUsdIlsRate()) * mult).toFixed(2)) : quote.regularMarketDayLow * mult) : undefined,
+      dayHigh: quote.regularMarketDayHigh ? (proxy?.inUSD ? Number((quote.regularMarketDayHigh * rate * mult).toFixed(2)) : quote.regularMarketDayHigh * mult) : undefined,
+      dayLow: quote.regularMarketDayLow ? (proxy?.inUSD ? Number((quote.regularMarketDayLow * rate * mult).toFixed(2)) : quote.regularMarketDayLow * mult) : undefined,
       fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh ? quote.fiftyTwoWeekHigh * mult : undefined,
       fiftyTwoWeekLow: quote.fiftyTwoWeekLow ? quote.fiftyTwoWeekLow * mult : undefined,
       marketCap: quote.marketCap,
@@ -171,17 +171,25 @@ export async function getQuotes(symbols: string[]): Promise<Map<string, QuoteDat
   }
 
   try {
-    // Fetch quotes in parallel but with small batches
-    const batchSize = 10;
-    for (let i = 0; i < symbolsToFetch.length; i += batchSize) {
-      const batch = symbolsToFetch.slice(i, i + batchSize);
-      const promises = batch.map(async (symbol) => {
-        const quote = await getQuote(symbol);
-        if (quote) {
-          results.set(symbol, quote);
+    // Pre-fetch rate once for all proxy calculations
+    const usdIlsRate = await getUsdIlsRate();
+
+    // Fetch all uncached quotes in parallel
+    const fetched = await Promise.all(
+      symbolsToFetch.map(async (symbol) => {
+        try {
+          const q = await getQuote(symbol, usdIlsRate);
+          return { symbol, quote: q };
+        } catch {
+          return { symbol, quote: null };
         }
-      });
-      await Promise.all(promises);
+      })
+    );
+
+    for (const { symbol, quote } of fetched) {
+      if (quote) {
+        results.set(symbol, quote);
+      }
     }
   } catch (error) {
     console.error('Error fetching multiple quotes:', error);
@@ -190,40 +198,51 @@ export async function getQuotes(symbols: string[]): Promise<Map<string, QuoteDat
   return results;
 }
 
+let usdIlsPromise: Promise<number> | null = null;
+
 /**
  * Get USD/ILS exchange rate
  */
 export async function getUsdIlsRate(): Promise<number> {
-  try {
-    const cached = cache.get('USDILS=X');
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      return cached.data.price;
-    }
-
-    const quote = await yahooFinance.quote('USDILS=X');
-    
-    if (quote && quote.regularMarketPrice) {
-      const quoteData: QuoteData = {
-        symbol: 'USDILS=X',
-        price: quote.regularMarketPrice,
-        change: quote.regularMarketChange || 0,
-        changePercent: quote.regularMarketChangePercent || 0,
-        previousClose: quote.regularMarketPreviousClose || quote.regularMarketPrice,
-        currency: 'ILS',
-        marketState: quote.marketState || 'CLOSED',
-        lastUpdated: new Date(),
-      };
-      
-      cache.set('USDILS=X', { data: quoteData, timestamp: Date.now() });
-      return quote.regularMarketPrice;
-    }
-    
-    // Fallback rate if API fails
-    return 3.7;
-  } catch (error) {
-    console.error('Error fetching USD/ILS rate:', error);
-    return 3.7; // Fallback rate
+  const cached = cache.get('USDILS=X');
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data.price;
   }
+
+  if (usdIlsPromise) {
+    return usdIlsPromise;
+  }
+
+  usdIlsPromise = (async () => {
+    try {
+      const quote = await yahooFinance.quote('USDILS=X');
+      
+      if (quote && quote.regularMarketPrice) {
+        const quoteData: QuoteData = {
+          symbol: 'USDILS=X',
+          price: quote.regularMarketPrice,
+          change: quote.regularMarketChange || 0,
+          changePercent: quote.regularMarketChangePercent || 0,
+          previousClose: quote.regularMarketPreviousClose || quote.regularMarketPrice,
+          currency: 'ILS',
+          marketState: quote.marketState || 'CLOSED',
+          lastUpdated: new Date(),
+        };
+        
+        cache.set('USDILS=X', { data: quoteData, timestamp: Date.now() });
+        return quote.regularMarketPrice;
+      }
+      
+      return 3.7;
+    } catch (error) {
+      console.error('Error fetching USD/ILS rate:', error);
+      return 3.7; // Fallback rate
+    } finally {
+      usdIlsPromise = null;
+    }
+  })();
+
+  return usdIlsPromise;
 }
 
 /**
