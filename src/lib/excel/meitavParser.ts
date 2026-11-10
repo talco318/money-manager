@@ -652,21 +652,25 @@ export function parseExcelFile(buffer: ArrayBuffer): ImportResult {
 }
 
 /**
- * Create a unique hash for duplicate detection
- * Includes more fields for better uniqueness
+ * Create a robust, canonical hash for duplicate detection.
+ * Uniquely identifies transactions by their immutable financial footprint
+ * (date, type, symbol, currency, quantity, totalAmount).
+ * Avoids cosmetic differences such as company name changes, raw Hebrew labels,
+ * or minor floating-point price roundings between report versions.
  */
 export function createTransactionHash(transaction: TransactionInput): string {
   const dateStr = transaction.date.toISOString().split('T')[0];
-  const symbol = transaction.symbol || 'N/A';
-  const name = transaction.name || 'N/A';
-  const quantity = transaction.quantity?.toFixed(4) || '0';
-  const price = transaction.price?.toFixed(4) || '0';
+  const symbol = (transaction.symbol || 'N/A').toUpperCase().replace(/\.US$/i, '').trim();
   const type = transaction.type;
-  const rawType = transaction.rawType || '';
   const currency = transaction.currency || 'USD';
-  const totalUSD = transaction.totalAmountUSD?.toFixed(2) || '0';
-  const totalILS = transaction.totalAmountILS?.toFixed(2) || '0';
+  const quantity = Math.abs(transaction.quantity || 0).toFixed(3);
   
-  // Include more fields for better uniqueness
-  return `${dateStr}_${symbol}_${name}_${type}_${rawType}_${currency}_${quantity}_${price}_${totalUSD}_${totalILS}`;
+  // Total cash impact rounded to integer to prevent float / rounding differences across reports
+  const total = Math.round(
+    currency === 'USD'
+      ? Math.abs(transaction.totalAmountUSD || 0)
+      : Math.abs(transaction.totalAmountILS || 0)
+  );
+
+  return `${dateStr}_${type}_${symbol}_${currency}_${quantity}_${total}`;
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseExcelFile, createTransactionHash } from '@/lib/excel';
 import prisma from '@/lib/prisma';
-import { syncHoldings } from '@/lib/holdings';
+import { syncHoldings, deduplicateTransactions } from '@/lib/holdings';
 import { TransactionInput } from '@/types';
 
 export async function POST(request: NextRequest) {
@@ -128,7 +128,8 @@ export async function POST(request: NextRequest) {
         })),
       });
 
-      // Recalculate holdings after import
+      // Auto-deduplicate and recalculate holdings after import
+      await deduplicateTransactions();
       await syncHoldings();
     }
 

@@ -308,6 +308,30 @@ export async function repairLegacyTransactions(): Promise<number> {
     });
     repairedCount += negativeDeposits.count;
 
+    // Repair any Alphabet transactions with security number 60032877 that were mapped to NVDA
+    const repairedAlphabet = await prisma.transaction.updateMany({
+      where: {
+        symbol: 'NVDA',
+        name: { contains: 'Alphabet' },
+      },
+      data: {
+        symbol: 'GOOGL',
+      },
+    });
+    repairedCount += repairedAlphabet.count;
+
+    // Repair Alphabet Class C transactions with security number 60354768 to GOOG
+    const repairedGoogC = await prisma.transaction.updateMany({
+      where: {
+        name: { contains: '60354768' },
+        symbol: { not: 'GOOG' },
+      },
+      data: {
+        symbol: 'GOOG',
+      },
+    });
+    repairedCount += repairedGoogC.count;
+
     if (repairedCount > 0) {
       console.log(`Repaired ${repairedCount} legacy transactions in database`);
     }
@@ -319,11 +343,83 @@ export async function repairLegacyTransactions(): Promise<number> {
 }
 
 /**
+ * Automatically find and remove duplicate transactions based on their unique financial signature:
+ * (date, type, symbol, currency, quantity, totalAmount).
+ * Keeps the oldest/primary record and removes duplicate records created by overlapping imports.
+ */
+export async function deduplicateTransactions(): Promise<{ removedCount: number }> {
+  try {
+    const allTransactions = await prisma.transaction.findMany({
+      orderBy: [
+        { date: 'asc' },
+        { createdAt: 'asc' },
+      ],
+      select: {
+        id: true,
+        date: true,
+        type: true,
+        symbol: true,
+        currency: true,
+        quantity: true,
+        price: true,
+        totalAmountUSD: true,
+        totalAmountILS: true,
+        createdAt: true,
+      },
+    });
+
+    const seenSignatures = new Map<string, string>(); // signature -> primary id
+    const duplicateIds: string[] = [];
+
+    for (const tx of allTransactions) {
+      const dateStr = tx.date.toISOString().split('T')[0];
+      const symbol = (tx.symbol || 'N/A').toUpperCase().replace(/\.US$/i, '').trim();
+      const type = tx.type;
+      const currency = tx.currency || 'USD';
+      const quantity = Math.abs(tx.quantity || 0).toFixed(3);
+      const total = Math.round(
+        currency === 'USD'
+          ? Math.abs(tx.totalAmountUSD || 0)
+          : Math.abs(tx.totalAmountILS || 0)
+      );
+
+      const signature = `${dateStr}_${type}_${symbol}_${currency}_${quantity}_${total}`;
+
+      if (seenSignatures.has(signature)) {
+        duplicateIds.push(tx.id);
+      } else {
+        seenSignatures.set(signature, tx.id);
+      }
+    }
+
+    if (duplicateIds.length > 0) {
+      console.log(`Found ${duplicateIds.length} duplicate transactions to delete.`);
+      // Delete duplicates in chunks of 500
+      for (let i = 0; i < duplicateIds.length; i += 500) {
+        const chunk = duplicateIds.slice(i, i + 500);
+        await prisma.transaction.deleteMany({
+          where: { id: { in: chunk } },
+        });
+      }
+      console.log(`Successfully removed ${duplicateIds.length} duplicate transactions.`);
+    }
+
+    return { removedCount: duplicateIds.length };
+  } catch (error) {
+    console.error('Error during transaction deduplication:', error);
+    return { removedCount: 0 };
+  }
+}
+
+/**
  * Sync holdings table with calculated values
  * This updates the Holding table in the database
  */
 export async function syncHoldings(): Promise<void> {
-  // First auto-repair any corrupted/legacy transactions if present
+  // First auto-deduplicate any overlapping/duplicate transactions
+  await deduplicateTransactions();
+
+  // Next auto-repair any corrupted/legacy transactions if present
   await repairLegacyTransactions();
 
   const calculatedHoldings = await calculateHoldings();
