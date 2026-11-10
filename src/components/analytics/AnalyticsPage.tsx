@@ -12,6 +12,9 @@ import { RiskExposure } from './RiskExposure';
 import { WealthSimulator } from './WealthSimulator';
 import { TaxLossHarvesting } from './TaxLossHarvesting';
 import { RiskAdjustedMetrics } from './RiskAdjustedMetrics';
+import { StressTesting } from './StressTesting';
+import { FxAttribution } from './FxAttribution';
+import { DividendYocDashboard } from './DividendYocDashboard';
 import {
   Trophy,
   Target,
@@ -21,24 +24,41 @@ import {
   DollarSign,
   Scale,
   Activity,
+  ShieldAlert,
+  ArrowRightLeft,
+  Coins,
   RefreshCw,
 } from 'lucide-react';
 
-type Tab = 'positions' | 'journal' | 'exposure' | 'friction' | 'tax-loss' | 'risk-metrics' | 'simulator' | 'dividends';
+type Tab =
+  | 'tax-loss'
+  | 'risk-metrics'
+  | 'stress-test'
+  | 'fx-attribution'
+  | 'dividend-yoc'
+  | 'positions'
+  | 'journal'
+  | 'exposure'
+  | 'friction'
+  | 'simulator'
+  | 'dividends';
 
 const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'tax-loss', label: 'קצירת הפסדים ומיטוב מס', icon: Scale },
   { id: 'risk-metrics', label: 'מדדי סיכון (Sharpe)', icon: Activity },
+  { id: 'stress-test', label: 'סימולטור קיצון (Stress)', icon: ShieldAlert },
+  { id: 'fx-attribution', label: 'פירוק תשואת מטבע (FX)', icon: ArrowRightLeft },
+  { id: 'dividend-yoc', label: 'דיבידנדים ו-YOC', icon: Coins },
   { id: 'positions', label: 'מה החזקתי ומתי', icon: Trophy },
   { id: 'journal', label: 'יומן הצלחה ומסחר', icon: Target },
   { id: 'exposure', label: 'חשיפות וסיכון אמיתי', icon: Globe },
   { id: 'friction', label: 'שחיקת עמלות ומס', icon: Receipt },
   { id: 'simulator', label: 'סימולטור צמיחה', icon: Rocket },
-  { id: 'dividends', label: 'דיבידנדים', icon: DollarSign },
+  { id: 'dividends', label: 'היסטוריית דיבידנדים', icon: DollarSign },
 ];
 
 export function AnalyticsPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('positions');
+  const [activeTab, setActiveTab] = useState<Tab>('tax-loss');
   const { dividends, isLoading: isAnalyticsLoading, refresh: refreshAnalytics } = useAnalytics();
   const { data: intelligence, isLoading: isIntelLoading, refresh: refreshIntel, error: intelError } = useIntelligence();
 
@@ -57,7 +77,7 @@ export function AnalyticsPage() {
             מודיעין ותובנות פיננסיות
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            ניתוח עומק של פוזיציות עבר, שיעורי הצלחה, חשיפות מטבע ושחיקת עמלות
+            ניתוח עומק של ביצועים, מדדי סיכון Sharpe/Sortino, סימולציות קיצון, פירוק תשואת מט"ח ו-YOC
           </p>
         </div>
 
@@ -111,6 +131,18 @@ export function AnalyticsPage() {
 
       {activeTab === 'risk-metrics' && intelligence && (
         <RiskAdjustedMetrics stats={intelligence.riskMetrics} />
+      )}
+
+      {activeTab === 'stress-test' && intelligence && (
+        <StressTesting stats={intelligence.stressTest} isLoading={isIntelLoading} />
+      )}
+
+      {activeTab === 'fx-attribution' && intelligence && (
+        <FxAttribution stats={intelligence.fxAttribution} isLoading={isIntelLoading} />
+      )}
+
+      {activeTab === 'dividend-yoc' && intelligence && (
+        <DividendYocDashboard stats={intelligence.dividendYoc} isLoading={isIntelLoading} />
       )}
 
       {activeTab === 'positions' && intelligence && (

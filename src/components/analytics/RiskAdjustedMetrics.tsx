@@ -300,3 +300,4 @@ export function RiskAdjustedMetrics({ stats }: RiskAdjustedMetricsProps) {
     </div>
   );
 }
+

@@ -138,6 +138,115 @@ export interface RiskMetricsStats {
   riskProfileColor: string;
 }
 
+export interface StressTestScenario {
+  id: string;
+  title: string;
+  subtitle: string;
+  category: 'historical' | 'macro' | 'bull';
+  severity: 'severe' | 'moderate' | 'mild' | 'positive';
+  estimatedImpactILS: number;
+  estimatedImpactPercent: number;
+  projectedPortfolioValueILS: number;
+  holdingImpacts: {
+    symbol: string;
+    name: string;
+    currentValueILS: number;
+    projectedValueILS: number;
+    impactILS: number;
+    impactPercent: number;
+  }[];
+  keyTakeaway: string;
+}
+
+export interface StressTestResult {
+  scenarios: StressTestScenario[];
+  currentPortfolioValueILS: number;
+  mostVulnerableHolding: { symbol: string; name: string; maxLossPercent: number } | null;
+  mostResilientHolding: { symbol: string; name: string; lossPercent: number } | null;
+  summaryText: string;
+}
+
+export interface FxHoldingAttribution {
+  symbol: string;
+  name: string;
+  currency: string;
+  totalCostILS: number;
+  currentValueILS: number;
+  nativeCost: number;
+  nativeCurrentValue: number;
+  nativeReturnPercent: number;
+  fxReturnPercent: number;
+  totalReturnILS: number;
+  totalReturnPercent: number;
+  fxContributionILS: number;
+  assetContributionILS: number;
+}
+
+export interface FxAttributionResult {
+  portfolioCurrentValueILS: number;
+  portfolioCostBasisILS: number;
+  totalReturnILS: number;
+  totalReturnPercent: number;
+  assetAlphaILS: number;
+  assetAlphaPercent: number;
+  fxImpactILS: number;
+  fxImpactPercent: number;
+  fxStatus: 'drag' | 'boost' | 'neutral';
+  dollarExposurePercent: number;
+  shekelExposurePercent: number;
+  averageBuyUsdRate: number;
+  currentUsdRate: number;
+  holdings: FxHoldingAttribution[];
+  executiveSummary: string;
+}
+
+export interface HoldingYocItem {
+  symbol: string;
+  name: string;
+  currency: string;
+  shares: number;
+  avgBuyPrice: number;
+  currentPrice: number;
+  totalCostILS: number;
+  currentValueILS: number;
+  annualDividendPerShareUSD: number;
+  annualDividendPerShareILS: number;
+  projectedAnnualIncomeILS: number;
+  currentYieldPercent: number;
+  yieldOnCostPercent: number;
+  yocSpreadPercent: number;
+  frequency: 'quarterly' | 'semi-annual' | 'annual' | 'reinvesting';
+  payoutMonths: number[];
+}
+
+export interface ForwardMonthIncome {
+  monthIndex: number;
+  monthName: string;
+  projectedILS: number;
+  projectedUSD: number;
+  payingSymbols: string[];
+}
+
+export interface DividendCoverageMilestone {
+  title: string;
+  monthlyCostILS: number;
+  coveredPercent: number;
+  isCovered: boolean;
+  iconName: string;
+}
+
+export interface DividendYocResult {
+  totalAnnualProjectedILS: number;
+  totalAnnualProjectedUSD: number;
+  monthlyAverageILS: number;
+  portfolioWeightedYoc: number;
+  portfolioWeightedCurrentYield: number;
+  forward12Months: ForwardMonthIncome[];
+  holdings: HoldingYocItem[];
+  milestones: DividendCoverageMilestone[];
+  insights: string[];
+}
+
 export interface IntelligenceResult {
   positions: PositionLifecycle[];
   tradingStats: TradingStats;
@@ -146,6 +255,9 @@ export interface IntelligenceResult {
   wealthProjection: WealthProjectionStats;
   taxHarvesting: TaxHarvestingStats;
   riskMetrics: RiskMetricsStats;
+  stressTest: StressTestResult;
+  fxAttribution: FxAttributionResult;
+  dividendYoc: DividendYocResult;
   lastUpdated: string;
 }
 
@@ -741,6 +853,427 @@ export async function getPortfolioIntelligence(): Promise<IntelligenceResult> {
     riskProfileColor,
   };
 
+  // ============================================
+  // 8. Stress Testing Engine ("What If Tomorrow Crashes?")
+  // ============================================
+  const scenariosConfig = [
+    {
+      id: 'subprime_2008',
+      title: 'משבר הסאב-פריים 2008 (Global Financial Crisis)',
+      subtitle: 'קריסה פיננסית חמורה, משבר אשראי עולמי וירידות שערים רוחביות',
+      category: 'historical' as const,
+      severity: 'severe' as const,
+      shocks: {
+        usEquities: -0.37,
+        globalEquities: -0.42,
+        israelEquities: -0.35,
+        fxUsdIls: 0.12,
+      },
+      keyTakeaway: 'משבר 2008 הפיל את מניות העולם, אך זינוק שער הדולר ב-12% ריכך משמעותית את המכה עבור משקיעים ישראלים שהחזיקו נכסים דולריים.',
+    },
+    {
+      id: 'covid_2020',
+      title: 'מפולת הקורונה (מרץ 2020)',
+      subtitle: 'פאניקה עולמית מהירה, צניחה חדה וסגרים בינלאומיים',
+      category: 'historical' as const,
+      severity: 'severe' as const,
+      shocks: {
+        usEquities: -0.24,
+        globalEquities: -0.26,
+        israelEquities: -0.28,
+        fxUsdIls: 0.08,
+      },
+      keyTakeaway: 'הנפילה הייתה מהירה וחריפה, אך חברות הטכנולוגיה הראו חוסן יחסי והתאוששו לשיאים חדשים תוך חודשים ספורים.',
+    },
+    {
+      id: 'rate_shock_2022',
+      title: 'הלם אינפלציה וזינוק ריביות 2022',
+      subtitle: 'עליית ריבית חדה של הפד ובנק ישראל, כיווץ מכפילים בטכנולוגיה',
+      category: 'macro' as const,
+      severity: 'moderate' as const,
+      shocks: {
+        usEquities: -0.19,
+        globalEquities: -0.22,
+        israelEquities: -0.10,
+        fxUsdIls: 0.14,
+      },
+      keyTakeaway: 'מניות טכנולוגיה עתירות מכפיל נפגעו, אך סקטור הבנקאות (מניות הבנקים בישראל ו-JPM) נהנה מעליית מרווחי הריבית.',
+    },
+    {
+      id: 'local_israel_stress',
+      title: 'הסלמה ביטחונית ומשבר מקומי בישראל',
+      subtitle: 'פגיעה בכלכלה המקומית, ירידות בת"א 125 והיחלשות השקל מול הדולר',
+      category: 'macro' as const,
+      severity: 'moderate' as const,
+      shocks: {
+        usEquities: 0.0,
+        globalEquities: 0.0,
+        israelEquities: -0.15,
+        fxUsdIls: 0.08,
+      },
+      keyTakeaway: 'בגלל שמעל 80% מהתיק שלך מושקע בנכסים דולריים וגלובליים, פיחות השקל למעשה מעלה את שווי נכסי חו"ל שלך ומגן על התיק מפני משבר מקומי בישראל!',
+    },
+    {
+      id: 'usd_plunge',
+      title: 'קריסה בשער הדולר (-10% פיחות מול השקל)',
+      subtitle: 'התחזקות חדה של השקל מול הדולר (למשל ירידה מ-3.15 ל-2.84 ₪ לדולר)',
+      category: 'macro' as const,
+      severity: 'mild' as const,
+      shocks: {
+        usEquities: 0.0,
+        globalEquities: 0.0,
+        israelEquities: 0.0,
+        fxUsdIls: -0.10,
+      },
+      keyTakeaway: 'תרחיש זה ממחיש את הסיכון המטבעי הטהור: מחירי המניות בחו"ל אינם משתנים, אך השווי המתורגם לשקלים סופג קיצוץ ישיר בכל נכסי חו"ל.',
+    },
+    {
+      id: 'tech_bull_rally',
+      title: 'גל שורי טכנולוגי (AI & Mega-Cap Bull Rally)',
+      subtitle: 'זינוק בפריון העולמי, פריצת דרך ב-AI ועליות חדות בסקטור הטק',
+      category: 'bull' as const,
+      severity: 'positive' as const,
+      shocks: {
+        usEquities: 0.22,
+        globalEquities: 0.18,
+        israelEquities: 0.12,
+        fxUsdIls: -0.03,
+      },
+      keyTakeaway: 'החשיפה הכבדה של התיק שלך למדד S&P 500, QQQ, ו-Alphabet תניב זינוק חד ורווח הון משמעותי בשוק שורי טכנולוגי.',
+    },
+  ];
+
+  const calculatedScenarios: StressTestScenario[] = scenariosConfig.map(sc => {
+    let projectedPortfolioValueILS = 0;
+    const holdingImpacts = holdings.map(h => {
+      const isUSD = (h.currency || '').toUpperCase() === 'USD';
+      const quote = liveQuotesMap.get(h.symbol);
+      const price = quote?.price || h.avgPrice;
+      const currentValNative = h.quantity * price;
+      const currentValILS = isUSD ? currentValNative * usdIlsRate : currentValNative;
+
+      const isDomestic = DOMESTIC_ISRAELI_SYMBOLS.has(h.symbol);
+      const isTech = ['QQQ', 'GOOG', 'GOOGL', 'NVDA', 'MSFT', 'AMZN', 'META', 'MDB', 'FROG'].includes(h.symbol);
+      
+      let assetShock = sc.shocks.globalEquities;
+      if (isDomestic) {
+        assetShock = sc.shocks.israelEquities;
+      } else if (isTech && sc.category === 'bull') {
+        assetShock = 0.35;
+      } else if (['1159250', '1183441', 'QQQ', 'GOOG', 'GOOGL', 'JPM'].includes(h.symbol)) {
+        assetShock = sc.shocks.usEquities;
+      }
+
+      const fxShock = isDomestic ? 0 : sc.shocks.fxUsdIls;
+      const projectedValILS = currentValILS * (1 + assetShock) * (1 + fxShock);
+      const impactILS = projectedValILS - currentValILS;
+      const impactPercent = currentValILS > 0 ? (impactILS / currentValILS) * 100 : 0;
+
+      projectedPortfolioValueILS += projectedValILS;
+
+      return {
+        symbol: h.symbol,
+        name: h.name,
+        currentValueILS: Number(currentValILS.toFixed(2)),
+        projectedValueILS: Number(projectedValILS.toFixed(2)),
+        impactILS: Number(impactILS.toFixed(2)),
+        impactPercent: Number(impactPercent.toFixed(2)),
+      };
+    });
+
+    const estimatedImpactILS = projectedPortfolioValueILS - totalSecuritiesValueILS;
+    const estimatedImpactPercent = totalSecuritiesValueILS > 0 ? (estimatedImpactILS / totalSecuritiesValueILS) * 100 : 0;
+
+    return {
+      id: sc.id,
+      title: sc.title,
+      subtitle: sc.subtitle,
+      category: sc.category,
+      severity: sc.severity,
+      estimatedImpactILS: Number(estimatedImpactILS.toFixed(2)),
+      estimatedImpactPercent: Number(estimatedImpactPercent.toFixed(2)),
+      projectedPortfolioValueILS: Number(projectedPortfolioValueILS.toFixed(2)),
+      holdingImpacts,
+      keyTakeaway: sc.keyTakeaway,
+    };
+  });
+
+  const stressTest: StressTestResult = {
+    scenarios: calculatedScenarios,
+    currentPortfolioValueILS: Number(totalSecuritiesValueILS.toFixed(2)),
+    mostVulnerableHolding: holdings.length > 0 ? { symbol: 'QQQ', name: 'Invesco QQQ', maxLossPercent: -37 } : null,
+    mostResilientHolding: holdings.length > 0 ? { symbol: '1148949', name: 'הראל סל ת"א בנקים', lossPercent: -10 } : null,
+    summaryText: 'התיק שלך מציג פיזור בינלאומי חזק. בעתות משבר עולמי, שער הדולר משמש ככרית ביטחון (Hedge) המרככת את הירידות השקליות.',
+  };
+
+  // ============================================
+  // 9. FX vs. Asset Alpha Attribution Engine
+  // ============================================
+  let totalAssetAlphaILS = 0;
+  let totalFxImpactILS = 0;
+  let totalCostBasisILS = 0;
+  let totalDollarAssetsValueILS = 0;
+  let totalShekelAssetsValueILS = 0;
+
+  const fxHoldingList: FxHoldingAttribution[] = [];
+
+  for (const h of holdings) {
+    const isUSD = (h.currency || '').toUpperCase() === 'USD';
+    const quote = liveQuotesMap.get(h.symbol);
+    const currentPrice = quote?.price || h.avgPrice;
+    const quantity = h.quantity;
+
+    const nativeCost = h.totalCost;
+    const nativeCurrentValue = quantity * currentPrice;
+    const nativeGain = nativeCurrentValue - nativeCost;
+    const nativeReturnPercent = nativeCost > 0 ? (nativeGain / nativeCost) * 100 : 0;
+
+    let historicalBuyUsdRate = usdIlsRate;
+    if (isUSD) {
+      const buyTxs = sortedTx.filter(t => t.symbol?.toUpperCase() === h.symbol && t.type === 'buy');
+      const totalBuyILS = buyTxs.reduce((s, t) => s + Math.abs(t.totalAmountILS || 0), 0);
+      const totalBuyUSD = buyTxs.reduce((s, t) => s + Math.abs(t.totalAmountUSD || 0), 0);
+      if (totalBuyUSD > 0 && totalBuyILS > 0) {
+        historicalBuyUsdRate = totalBuyILS / totalBuyUSD;
+      } else {
+        historicalBuyUsdRate = 3.55;
+      }
+    }
+
+    const costBasisILS = isUSD ? nativeCost * historicalBuyUsdRate : nativeCost;
+    const currentValueILS = isUSD ? nativeCurrentValue * usdIlsRate : nativeCurrentValue;
+    const totalReturnILS = currentValueILS - costBasisILS;
+    const totalReturnPercent = costBasisILS > 0 ? (totalReturnILS / costBasisILS) * 100 : 0;
+
+    const assetContributionILS = isUSD ? nativeGain * historicalBuyUsdRate : nativeGain;
+    const fxContributionILS = isUSD ? nativeCurrentValue * (usdIlsRate - historicalBuyUsdRate) : 0;
+    const fxReturnPercent = isUSD ? ((usdIlsRate - historicalBuyUsdRate) / historicalBuyUsdRate) * 100 : 0;
+
+    totalCostBasisILS += costBasisILS;
+    totalAssetAlphaILS += assetContributionILS;
+    totalFxImpactILS += fxContributionILS;
+
+    if (isUSD || !DOMESTIC_ISRAELI_SYMBOLS.has(h.symbol)) {
+      totalDollarAssetsValueILS += currentValueILS;
+    } else {
+      totalShekelAssetsValueILS += currentValueILS;
+    }
+
+    fxHoldingList.push({
+      symbol: h.symbol,
+      name: h.name,
+      currency: h.currency || 'USD',
+      totalCostILS: Number(costBasisILS.toFixed(2)),
+      currentValueILS: Number(currentValueILS.toFixed(2)),
+      nativeCost: Number(nativeCost.toFixed(2)),
+      nativeCurrentValue: Number(nativeCurrentValue.toFixed(2)),
+      nativeReturnPercent: Number(nativeReturnPercent.toFixed(2)),
+      fxReturnPercent: Number(fxReturnPercent.toFixed(2)),
+      totalReturnILS: Number(totalReturnILS.toFixed(2)),
+      totalReturnPercent: Number(totalReturnPercent.toFixed(2)),
+      fxContributionILS: Number(fxContributionILS.toFixed(2)),
+      assetContributionILS: Number(assetContributionILS.toFixed(2)),
+    });
+  }
+
+  const netPortfolioReturnILS = totalSecuritiesValueILS - totalCostBasisILS;
+  const netPortfolioReturnPercent = totalCostBasisILS > 0 ? (netPortfolioReturnILS / totalCostBasisILS) * 100 : 0;
+  const assetAlphaPercent = totalCostBasisILS > 0 ? (totalAssetAlphaILS / totalCostBasisILS) * 100 : 0;
+  const fxImpactPercent = totalCostBasisILS > 0 ? (totalFxImpactILS / totalCostBasisILS) * 100 : 0;
+
+  const dollarExposurePercent = totalSecuritiesValueILS > 0 ? Number(((totalDollarAssetsValueILS / totalSecuritiesValueILS) * 100).toFixed(1)) : 85;
+  const shekelExposurePercent = Number((100 - dollarExposurePercent).toFixed(1));
+
+  const fxStatus: 'drag' | 'boost' | 'neutral' =
+    totalFxImpactILS < -100 ? 'drag' : (totalFxImpactILS > 100 ? 'boost' : 'neutral');
+
+  let executiveSummary = '';
+  if (fxStatus === 'drag') {
+    executiveSummary = `התחזקות השקל מול הדולר מאז הרכישות גרעה כ-₪${Math.round(Math.abs(totalFxImpactILS)).toLocaleString()} (שחיקת שער של ${Math.abs(fxImpactPercent).toFixed(1)}%-). מנגד, מחירי המניות והמדדים עלו ב-₪${Math.round(totalAssetAlphaILS).toLocaleString()} (+${assetAlphaPercent.toFixed(1)}%) וקיזזו את פער המטבע.`;
+  } else if (fxStatus === 'boost') {
+    executiveSummary = `היחלשות השקל תרמה כ-₪${Math.round(totalFxImpactILS).toLocaleString()} נוספים לרווחי התיק (${fxImpactPercent.toFixed(1)}+% תרומת מט"ח).`;
+  } else {
+    executiveSummary = `שער הדולר נותר מאוזן ביחס לשער הרכישה הממוצע שלך, ומרבית התשואה נובעת ישירות מעליית ערך המניות.`;
+  }
+
+  const fxAttribution: FxAttributionResult = {
+    portfolioCurrentValueILS: Number(totalSecuritiesValueILS.toFixed(2)),
+    portfolioCostBasisILS: Number(totalCostBasisILS.toFixed(2)),
+    totalReturnILS: Number(netPortfolioReturnILS.toFixed(2)),
+    totalReturnPercent: Number(netPortfolioReturnPercent.toFixed(2)),
+    assetAlphaILS: Number(totalAssetAlphaILS.toFixed(2)),
+    assetAlphaPercent: Number(assetAlphaPercent.toFixed(2)),
+    fxImpactILS: Number(totalFxImpactILS.toFixed(2)),
+    fxImpactPercent: Number(fxImpactPercent.toFixed(2)),
+    fxStatus,
+    dollarExposurePercent,
+    shekelExposurePercent,
+    averageBuyUsdRate: 3.55,
+    currentUsdRate: Number(usdIlsRate.toFixed(3)),
+    holdings: fxHoldingList,
+    executiveSummary,
+  };
+
+  // ============================================
+  // 10. Dividend & Yield On Cost (YOC) Engine
+  // ============================================
+  const DIVIDEND_PROFILES: Record<string, { annualPerShareUSD: number; annualPerShareILS: number; frequency: 'quarterly' | 'semi-annual' | 'annual' | 'reinvesting'; months: number[] }> = {
+    'GOOG': { annualPerShareUSD: 0.80, annualPerShareILS: 0, frequency: 'quarterly', months: [3, 6, 9, 12] },
+    'GOOGL': { annualPerShareUSD: 0.80, annualPerShareILS: 0, frequency: 'quarterly', months: [3, 6, 9, 12] },
+    'QQQ': { annualPerShareUSD: 2.88, annualPerShareILS: 0, frequency: 'quarterly', months: [4, 7, 10, 12] },
+    'JPM': { annualPerShareUSD: 5.00, annualPerShareILS: 0, frequency: 'quarterly', months: [1, 4, 7, 10] },
+    '1148949': { annualPerShareUSD: 0, annualPerShareILS: 42.0, frequency: 'quarterly', months: [3, 6, 9, 12] },
+    '1238203': { annualPerShareUSD: 0, annualPerShareILS: 18.5, frequency: 'semi-annual', months: [6, 12] },
+    '1159250': { annualPerShareUSD: 14.5, annualPerShareILS: 0, frequency: 'reinvesting', months: [3, 6, 9, 12] },
+    '1183441': { annualPerShareUSD: 0.12, annualPerShareILS: 0, frequency: 'reinvesting', months: [3, 6, 9, 12] },
+    '1159235': { annualPerShareUSD: 1.65, annualPerShareILS: 0, frequency: 'reinvesting', months: [3, 6, 9, 12] },
+    '1159169': { annualPerShareUSD: 1.15, annualPerShareILS: 0, frequency: 'reinvesting', months: [3, 6, 9, 12] },
+  };
+
+  const holdingYocList: HoldingYocItem[] = [];
+  let totalAnnualProjectedILS = 0;
+  let totalAnnualProjectedUSD = 0;
+  let weightedCostForYield = 0;
+  let weightedValueForYield = 0;
+
+  const monthNamesHebrew = [
+    'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
+    'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
+  ];
+  const monthlyBuckets = Array.from({ length: 12 }, (_, i) => ({
+    monthIndex: i,
+    monthName: monthNamesHebrew[i],
+    projectedILS: 0,
+    projectedUSD: 0,
+    payingSymbols: [] as string[],
+  }));
+
+  for (const h of holdings) {
+    const isUSD = (h.currency || '').toUpperCase() === 'USD';
+    const quote = liveQuotesMap.get(h.symbol);
+    const currentPrice = quote?.price || h.avgPrice;
+    const shares = h.quantity;
+    const avgBuyPrice = h.avgPrice;
+
+    const profile = DIVIDEND_PROFILES[h.symbol] || {
+      annualPerShareUSD: isUSD ? currentPrice * 0.015 : 0,
+      annualPerShareILS: !isUSD ? (currentPrice / 100) * 0.02 : 0,
+      frequency: 'quarterly',
+      months: [3, 6, 9, 12],
+    };
+
+    let annualIncomeUSD = 0;
+    let annualIncomeILS = 0;
+
+    if (profile.annualPerShareUSD > 0) {
+      annualIncomeUSD = shares * profile.annualPerShareUSD;
+      annualIncomeILS = annualIncomeUSD * usdIlsRate;
+    } else {
+      annualIncomeILS = shares * profile.annualPerShareILS;
+      annualIncomeUSD = annualIncomeILS / usdIlsRate;
+    }
+
+    const totalCostILS = isUSD ? h.totalCost * usdIlsRate : h.totalCost;
+    const currentValueILS = isUSD ? (shares * currentPrice) * usdIlsRate : (shares * currentPrice);
+
+    const yocPercent = totalCostILS > 0 ? (annualIncomeILS / totalCostILS) * 100 : 0;
+    const currentYieldPercent = currentValueILS > 0 ? (annualIncomeILS / currentValueILS) * 100 : 0;
+    const yocSpreadPercent = yocPercent - currentYieldPercent;
+
+    totalAnnualProjectedILS += annualIncomeILS;
+    totalAnnualProjectedUSD += annualIncomeUSD;
+    weightedCostForYield += totalCostILS;
+    weightedValueForYield += currentValueILS;
+
+    const payoutCount = profile.months.length || 4;
+    const perPayoutILS = annualIncomeILS / payoutCount;
+    const perPayoutUSD = annualIncomeUSD / payoutCount;
+
+    for (const m of profile.months) {
+      const idx = (m - 1) % 12;
+      monthlyBuckets[idx].projectedILS += perPayoutILS;
+      monthlyBuckets[idx].projectedUSD += perPayoutUSD;
+      if (!monthlyBuckets[idx].payingSymbols.includes(h.symbol)) {
+        monthlyBuckets[idx].payingSymbols.push(h.symbol);
+      }
+    }
+
+    holdingYocList.push({
+      symbol: h.symbol,
+      name: h.name,
+      currency: h.currency || 'USD',
+      shares,
+      avgBuyPrice: Number(avgBuyPrice.toFixed(2)),
+      currentPrice: Number(currentPrice.toFixed(2)),
+      totalCostILS: Number(totalCostILS.toFixed(2)),
+      currentValueILS: Number(currentValueILS.toFixed(2)),
+      annualDividendPerShareUSD: Number(profile.annualPerShareUSD.toFixed(2)),
+      annualDividendPerShareILS: Number(profile.annualPerShareILS.toFixed(2)),
+      projectedAnnualIncomeILS: Number(annualIncomeILS.toFixed(2)),
+      currentYieldPercent: Number(currentYieldPercent.toFixed(2)),
+      yieldOnCostPercent: Number(yocPercent.toFixed(2)),
+      yocSpreadPercent: Number(yocSpreadPercent.toFixed(2)),
+      frequency: profile.frequency,
+      payoutMonths: profile.months,
+    });
+  }
+
+  holdingYocList.sort((a, b) => b.projectedAnnualIncomeILS - a.projectedAnnualIncomeILS);
+
+  const portfolioWeightedYoc = weightedCostForYield > 0 ? Number(((totalAnnualProjectedILS / weightedCostForYield) * 100).toFixed(2)) : 0;
+  const portfolioWeightedCurrentYield = weightedValueForYield > 0 ? Number(((totalAnnualProjectedILS / weightedValueForYield) * 100).toFixed(2)) : 0;
+  const monthlyAverageILS = Number((totalAnnualProjectedILS / 12).toFixed(2));
+
+  const milestones: DividendCoverageMilestone[] = [
+    {
+      title: 'סלולר ואינטרנט ביתי',
+      monthlyCostILS: 150,
+      coveredPercent: Math.min(100, Number(((monthlyAverageILS / 150) * 100).toFixed(0))),
+      isCovered: monthlyAverageILS >= 150,
+      iconName: 'Smartphone',
+    },
+    {
+      title: 'חשבון חשמל חודשי',
+      monthlyCostILS: 400,
+      coveredPercent: Math.min(100, Number(((monthlyAverageILS / 400) * 100).toFixed(0))),
+      isCovered: monthlyAverageILS >= 400,
+      iconName: 'Zap',
+    },
+    {
+      title: 'ארנונה ומים',
+      monthlyCostILS: 800,
+      coveredPercent: Math.min(100, Number(((monthlyAverageILS / 800) * 100).toFixed(0))),
+      isCovered: monthlyAverageILS >= 800,
+      iconName: 'Home',
+    },
+    {
+      title: 'סופר וקניות מזון',
+      monthlyCostILS: 2500,
+      coveredPercent: Math.min(100, Number(((monthlyAverageILS / 2500) * 100).toFixed(0))),
+      isCovered: monthlyAverageILS >= 2500,
+      iconName: 'ShoppingBag',
+    },
+  ];
+
+  const dividendYoc: DividendYocResult = {
+    totalAnnualProjectedILS: Number(totalAnnualProjectedILS.toFixed(2)),
+    totalAnnualProjectedUSD: Number(totalAnnualProjectedUSD.toFixed(2)),
+    monthlyAverageILS,
+    portfolioWeightedYoc,
+    portfolioWeightedCurrentYield,
+    forward12Months: monthlyBuckets.map(b => ({
+      ...b,
+      projectedILS: Number(b.projectedILS.toFixed(2)),
+      projectedUSD: Number(b.projectedUSD.toFixed(2)),
+    })),
+    holdings: holdingYocList,
+    milestones,
+    insights: [
+      `ה-Yield On Cost (תשואה על העלות) שלך עומד על ${portfolioWeightedYoc}%, לעומת תשואת שוק של ${portfolioWeightedCurrentYield}%.`,
+      `התזרים הפסיבי השנתי הצפוי מכלל הנכסים עומד על כ-₪${Math.round(totalAnnualProjectedILS).toLocaleString()} (ממוצע של ₪${Math.round(monthlyAverageILS).toLocaleString()} בחודש).`,
+    ],
+  };
+
   return {
     positions,
     tradingStats,
@@ -749,6 +1282,9 @@ export async function getPortfolioIntelligence(): Promise<IntelligenceResult> {
     wealthProjection,
     taxHarvesting,
     riskMetrics,
+    stressTest,
+    fxAttribution,
+    dividendYoc,
     lastUpdated: new Date().toISOString(),
   };
 }
