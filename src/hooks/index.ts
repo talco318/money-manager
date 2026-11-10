@@ -4,3 +4,4 @@ export { useChartData, type Period } from './useChartData';
 export { useAlerts, type Alert, type AlertInput } from './useAlerts';
 export { useAnalytics, type DividendAnalytics, type CommissionAnalytics } from './useAnalytics';
 export { useSettings, type Settings } from './useSettings';
+export { useIntelligence } from './useIntelligence';

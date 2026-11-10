@@ -1,8 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { usePortfolio } from '@/hooks';
 import { StatCard, Card, Button } from '@/components/ui';
 import { HoldingsTable } from './HoldingsTable';
+import { usePrivacy } from '@/contexts/PrivacyContext';
+import { Eye, EyeOff, Sparkles, ArrowLeft } from 'lucide-react';
 
 function formatCurrency(value: number, currency: string = 'USD'): string {
   const formatter = new Intl.NumberFormat(currency === 'ILS' ? 'he-IL' : 'en-US', {
@@ -21,6 +24,7 @@ function formatPercent(value: number): string {
 
 export function Dashboard() {
   const { holdings, summary, usdIlsRate, isLoading, error, refresh, lastUpdated } = usePortfolio();
+  const { isPrivate, togglePrivacy, maskAmount } = usePrivacy();
 
   const totalValue = summary?.totalValue || 0;
   const totalValueILS = summary?.totalValueILS || 0;
@@ -37,6 +41,8 @@ export function Dashboard() {
   const isProfitable = totalPnLILS >= 0;
   const isDayPositive = dayChange >= 0;
 
+  const fmt = (val: number, cur: string = 'USD') => maskAmount(formatCurrency(val, cur));
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -45,9 +51,19 @@ export function Dashboard() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">דשבורד</h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">סקירה כללית של תיק ההשקעות שלך</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Privacy Mode Toggle */}
+          <button
+            onClick={togglePrivacy}
+            className="px-3 py-1.5 text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-1.5 text-xs font-semibold"
+            title={isPrivate ? "בטל מצב פרטיות" : "הפעל מצב פרטיות (הסתרת סכומים)"}
+          >
+            {isPrivate ? <EyeOff className="w-4 h-4 text-amber-500" /> : <Eye className="w-4 h-4" />}
+            <span className="hidden sm:inline">{isPrivate ? "חשוף סכומים" : "מצב פרטיות"}</span>
+          </button>
+
           {lastUpdated && (
-            <span className="text-sm text-gray-500 dark:text-gray-400">
+            <span className="text-xs text-gray-400 dark:text-gray-500 hidden md:inline">
               עודכן: {lastUpdated.toLocaleTimeString('he-IL')}
             </span>
           )}
@@ -56,11 +72,39 @@ export function Dashboard() {
             variant="outline" 
             size="sm"
             disabled={isLoading}
+            className="rounded-xl text-xs font-semibold"
           >
             {isLoading ? 'טוען...' : 'רענן נתונים'}
           </Button>
         </div>
       </div>
+
+      {/* Financial Intelligence Shortcut Banner */}
+      <Link
+        href="/analytics"
+        className="block p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xs hover:shadow-md hover:scale-[1.005] transition-all"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center shrink-0">
+              <Sparkles className="w-5 h-5 text-amber-300" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-extrabold text-sm sm:text-base">מודיעין ותובנות פיננסיות</h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-gray-900">חדש!</span>
+              </div>
+              <p className="text-xs text-blue-100 mt-0.5 line-clamp-1">
+                בדוק מה החזקת בעבר, רווח ממומש לכיס, שיעור הצלחה, סימולטור &quot;מה אם לא הייתי מוכר?&quot; ועוד
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-white/20 backdrop-blur-md flex items-center gap-1 shrink-0">
+            <span>צפה</span>
+            <ArrowLeft className="w-3.5 h-3.5" />
+          </span>
+        </div>
+      </Link>
 
       {/* Error Alert */}
       {error && (
@@ -73,27 +117,27 @@ export function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="שווי התיק"
-          value={isLoading ? '---' : formatCurrency(totalValueILS, 'ILS')}
-          subtitle={isLoading ? '---' : formatCurrency(totalValue, 'USD')}
+          value={isLoading ? '---' : fmt(totalValueILS, 'ILS')}
+          subtitle={isLoading ? '---' : fmt(totalValue, 'USD')}
           icon={<span className="text-2xl">💰</span>}
         />
         <StatCard
           title="רווח/הפסד כולל"
-          value={isLoading ? '---' : formatCurrency(totalPnLILS, 'ILS')}
+          value={isLoading ? '---' : fmt(totalPnLILS, 'ILS')}
           subtitle={
             isLoading
               ? '---'
               : netDepositsILS > 0
-                ? `${formatCurrency(totalPnL, 'USD')} • הפקדות נטו: ${formatCurrency(netDepositsILS, 'ILS')}`
-                : formatCurrency(totalPnL, 'USD')
+                ? `${fmt(totalPnL, 'USD')} • הפקדות נטו: ${fmt(netDepositsILS, 'ILS')}`
+                : fmt(totalPnL, 'USD')
           }
           trend={isLoading ? undefined : { value: totalPnLPercent, isPositive: isProfitable }}
           icon={<span className="text-2xl">{isProfitable ? '📈' : '📉'}</span>}
         />
         <StatCard
           title="שינוי יומי"
-          value={isLoading ? '---' : `${isDayPositive ? '+' : ''}${formatCurrency(dayChange * usdIlsRate, 'ILS')}`}
-          subtitle={isLoading ? '---' : `${isDayPositive ? '+' : ''}${formatCurrency(dayChange, 'USD')}`}
+          value={isLoading ? '---' : `${isDayPositive ? '+' : ''}${fmt(dayChange * usdIlsRate, 'ILS')}`}
+          subtitle={isLoading ? '---' : `${isDayPositive ? '+' : ''}${fmt(dayChange, 'USD')}`}
           trend={isLoading ? undefined : { value: dayChangePercent, isPositive: isDayPositive }}
           icon={<span className="text-2xl">{isDayPositive ? '🟢' : '🔴'}</span>}
         />
@@ -125,7 +169,7 @@ export function Dashboard() {
                 🇮🇱 יתרה שקלית (עו"ש)
               </span>
               <p className="text-lg font-bold text-gray-900 dark:text-white">
-                {isLoading ? '---' : formatCurrency(cashBalanceILS, 'ILS')}
+                {isLoading ? '---' : fmt(cashBalanceILS, 'ILS')}
               </p>
               <span className="text-[11px] text-gray-400">
                 מעמודת &quot;יתרה שקלית&quot;
@@ -138,10 +182,10 @@ export function Dashboard() {
                 🇺🇸 יתרה דולרית (נייר 99028)
               </span>
               <p className="text-lg font-bold text-gray-900 dark:text-white">
-                {isLoading ? '---' : formatCurrency(cashBalanceUSD, 'USD')}
+                {isLoading ? '---' : fmt(cashBalanceUSD, 'USD')}
               </p>
               <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                ≈ {isLoading ? '---' : formatCurrency(cashBalanceUSD * usdIlsRate, 'ILS')}
+                ≈ {isLoading ? '---' : fmt(cashBalanceUSD * usdIlsRate, 'ILS')}
               </span>
             </div>
 
@@ -151,7 +195,7 @@ export function Dashboard() {
                 💰 סה&quot;כ מזומן משוקלל
               </span>
               <p className="text-lg font-extrabold text-blue-600 dark:text-blue-400">
-                {isLoading ? '---' : formatCurrency(totalCashILS, 'ILS')}
+                {isLoading ? '---' : fmt(totalCashILS, 'ILS')}
               </p>
               <span className="text-[11px] text-gray-500 dark:text-gray-400">
                 {totalValueILS > 0 ? `${((totalCashILS / totalValueILS) * 100).toFixed(1)}% משווי התיק` : 'משוקלל לתיק'}

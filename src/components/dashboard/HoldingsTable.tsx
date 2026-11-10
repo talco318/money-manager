@@ -1,6 +1,7 @@
 'use client';
 
 import type { HoldingWithMarketData } from '@/types';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 
 interface HoldingsTableProps {
   holdings: HoldingWithMarketData[];
@@ -36,6 +37,9 @@ function formatPercent(value: number): string {
 }
 
 export function HoldingsTable({ holdings, isLoading, usdIlsRate = 3.7, cashBalances }: HoldingsTableProps) {
+  const { maskAmount } = usePrivacy();
+
+  const fmt = (val: number, cur: string = 'USD') => maskAmount(formatCurrency(val, cur));
   if (isLoading) {
     return (
       <div className="animate-pulse">
@@ -126,13 +130,13 @@ export function HoldingsTable({ holdings, isLoading, usdIlsRate = 3.7, cashBalan
                   {formatNumber(holding.quantity, holding.quantity % 1 === 0 ? 0 : 4)}
                 </td>
                 <td className="py-4 px-4 font-semibold text-gray-900 dark:text-white">
-                  {formatCurrency(holding.currentPrice || 0, currency)}
+                  {fmt(holding.currentPrice || 0, currency)}
                 </td>
                 <td className="py-4 px-4">
                   {holding.hasLiveQuote ? (
                     <div className={`flex flex-col ${isDayPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                       <span className="font-semibold">
-                        {isDayPositive ? '+' : ''}{formatCurrency(holding.dayChange || 0, currency)}
+                        {isDayPositive ? '+' : ''}{fmt(holding.dayChange || 0, currency)}
                       </span>
                       <span className="text-xs font-medium">
                         {formatPercent(holding.dayChangePercent || 0)}
@@ -145,13 +149,13 @@ export function HoldingsTable({ holdings, isLoading, usdIlsRate = 3.7, cashBalan
                   )}
                 </td>
                 <td className="py-4 px-4 text-gray-600 dark:text-gray-300">
-                  {formatCurrency(holding.avgPrice, currency)}
+                  {fmt(holding.avgPrice, currency)}
                 </td>
                 <td className="py-4 px-4 font-semibold text-gray-900 dark:text-white">
-                  {formatCurrency(holding.currentValue || 0, currency)}
+                  {fmt(holding.currentValue || 0, currency)}
                 </td>
                 <td className="py-4 px-4 font-bold text-gray-900 dark:text-white">
-                  {formatNumber(holding.currentValueILS || 0, 0)} ₪
+                  {maskAmount(`${formatNumber(holding.currentValueILS || 0, 0)} ₪`)}
                 </td>
                 <td className="py-4 px-4">
                   <div className={`inline-flex flex-col px-2.5 py-1 rounded-lg text-xs font-semibold ${
@@ -160,7 +164,7 @@ export function HoldingsTable({ holdings, isLoading, usdIlsRate = 3.7, cashBalan
                       : 'bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400 border border-rose-100 dark:border-rose-800/40'
                   }`}>
                     <span className="font-bold">
-                      {isProfitable ? '+' : ''}{formatCurrency(holding.pnl || 0, currency)}
+                      {isProfitable ? '+' : ''}{fmt(holding.pnl || 0, currency)}
                     </span>
                     <span className="text-[10px] opacity-80">
                       {formatPercent(holding.pnlPercent || 0)}
@@ -199,10 +203,10 @@ export function HoldingsTable({ holdings, isLoading, usdIlsRate = 3.7, cashBalan
                 {formatCurrency(1, 'USD')}
               </td>
               <td className="py-4 px-4 font-medium text-gray-900 dark:text-white">
-                {formatCurrency(cashBalances.usd, 'USD')}
+                {fmt(cashBalances.usd, 'USD')}
               </td>
               <td className="py-4 px-4 font-semibold text-blue-600 dark:text-blue-400">
-                {formatNumber(cashBalances.usd * usdIlsRate, 0)} ₪
+                {maskAmount(`${formatNumber(cashBalances.usd * usdIlsRate, 0)} ₪`)}
               </td>
               <td className="py-4 px-4 text-gray-400 dark:text-gray-500 text-xs">
                 —
@@ -229,19 +233,19 @@ export function HoldingsTable({ holdings, isLoading, usdIlsRate = 3.7, cashBalan
                 {formatNumber(cashBalances.ils, 2)}
               </td>
               <td className="py-4 px-4 text-gray-700 dark:text-gray-300">
-                {formatCurrency(1, 'ILS')}
+                {fmt(1, 'ILS')}
               </td>
               <td className="py-4 px-4 text-gray-400 dark:text-gray-500 text-xs">
                 —
               </td>
               <td className="py-4 px-4 text-gray-700 dark:text-gray-300">
-                {formatCurrency(1, 'ILS')}
+                {fmt(1, 'ILS')}
               </td>
               <td className="py-4 px-4 font-medium text-gray-900 dark:text-white">
-                {formatCurrency(cashBalances.ils, 'ILS')}
+                {fmt(cashBalances.ils, 'ILS')}
               </td>
               <td className="py-4 px-4 font-semibold text-green-600 dark:text-green-400">
-                {formatNumber(cashBalances.ils, 0)} ₪
+                {maskAmount(`${formatNumber(cashBalances.ils, 0)} ₪`)}
               </td>
               <td className="py-4 px-4 text-gray-400 dark:text-gray-500 text-xs">
                 —

@@ -1,80 +1,126 @@
 'use client';
 
-import { useState } from 'react';
-import { useAnalytics } from '@/hooks';
-import { Button, Select } from '@/components/ui';
+import React, { useState } from 'react';
+import { useAnalytics, useIntelligence } from '@/hooks';
+import { Button } from '@/components/ui';
 import { DividendAnalytics } from './DividendAnalytics';
 import { CommissionAnalytics } from './CommissionAnalytics';
+import { PositionsHistory } from './PositionsHistory';
+import { TradingJournal } from './TradingJournal';
+import { FrictionAnalytics } from './FrictionAnalytics';
+import { RiskExposure } from './RiskExposure';
+import { WealthSimulator } from './WealthSimulator';
+import {
+  Trophy,
+  Target,
+  Globe,
+  Receipt,
+  Rocket,
+  DollarSign,
+  RefreshCw,
+} from 'lucide-react';
 
-type Tab = 'dividends' | 'commissions';
+type Tab = 'positions' | 'journal' | 'exposure' | 'friction' | 'simulator' | 'dividends';
 
-const currentYear = new Date().getFullYear();
-const yearOptions = [
-  { value: '', label: 'כל השנים' },
-  ...Array.from({ length: 5 }, (_, i) => ({
-    value: String(currentYear - i),
-    label: String(currentYear - i),
-  })),
+const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'positions', label: 'מה החזקתי ומתי', icon: Trophy },
+  { id: 'journal', label: 'יומן הצלחה ומסחר', icon: Target },
+  { id: 'exposure', label: 'חשיפות וסיכון אמיתי', icon: Globe },
+  { id: 'friction', label: 'שחיקת עמלות ומס', icon: Receipt },
+  { id: 'simulator', label: 'סימולטור צמיחה', icon: Rocket },
+  { id: 'dividends', label: 'דיבידנדים', icon: DollarSign },
 ];
 
 export function AnalyticsPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('dividends');
-  const { dividends, commissions, isLoading, error, year, setYear, refresh } = useAnalytics();
+  const [activeTab, setActiveTab] = useState<Tab>('positions');
+  const { dividends, isLoading: isAnalyticsLoading, refresh: refreshAnalytics } = useAnalytics();
+  const { data: intelligence, isLoading: isIntelLoading, refresh: refreshIntel, error: intelError } = useIntelligence();
+
+  const isLoading = isIntelLoading || isAnalyticsLoading;
+
+  const handleRefresh = async () => {
+    await Promise.all([refreshIntel(), refreshAnalytics()]);
+  };
 
   return (
     <div className="space-y-6">
-      {/* Controls */}
+      {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        {/* Tabs */}
-        <div className="flex gap-2 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
-          <button
-            onClick={() => setActiveTab('dividends')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'dividends'
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            💵 דיבידנדים
-          </button>
-          <button
-            onClick={() => setActiveTab('commissions')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'commissions'
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            💸 עמלות
-          </button>
+        <div>
+          <h1 className="text-2xl font-black text-gray-900 dark:text-white">
+            מודיעין ותובנות פיננסיות
+          </h1>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            ניתוח עומק של פוזיציות עבר, שיעורי הצלחה, חשיפות מטבע ושחיקת עמלות
+          </p>
         </div>
 
-        {/* Filters */}
-        <div className="flex items-center gap-3">
-          <Select
-            value={year}
-            onChange={(e) => setYear(e.target.value)}
-            options={yearOptions}
-            className="w-32"
-          />
-          <Button variant="outline" size="sm" onClick={refresh} disabled={isLoading}>
-            {isLoading ? 'טוען...' : 'רענן'}
-          </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={isLoading}
+          className="rounded-xl flex items-center gap-1.5 self-end sm:self-auto"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+          {isLoading ? 'מרענן...' : 'רענן תובנות'}
+        </Button>
+      </div>
+
+      {/* Scrollable Tabs Bar */}
+      <div className="overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="flex gap-2 p-1.5 bg-gray-100 dark:bg-gray-800/80 rounded-2xl w-max sm:w-auto">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+                  isActive
+                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <Icon className={`w-4 h-4 ${isActive ? 'text-blue-600 dark:text-blue-400' : ''}`} />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Error Alert */}
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <p className="text-red-800 dark:text-red-200">{error}</p>
+      {intelError && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4">
+          <p className="text-red-800 dark:text-red-200 text-xs font-semibold">{intelError}</p>
         </div>
       )}
 
-      {/* Content */}
-      {activeTab === 'dividends' ? (
-        <DividendAnalytics data={dividends} isLoading={isLoading} />
-      ) : (
-        <CommissionAnalytics data={commissions} isLoading={isLoading} />
+      {/* Content Rendering */}
+      {activeTab === 'positions' && intelligence && (
+        <PositionsHistory positions={intelligence.positions} isLoading={isIntelLoading} />
+      )}
+
+      {activeTab === 'journal' && intelligence && (
+        <TradingJournal stats={intelligence.tradingStats} isLoading={isIntelLoading} />
+      )}
+
+      {activeTab === 'exposure' && intelligence && (
+        <RiskExposure stats={intelligence.trueExposure} isLoading={isIntelLoading} />
+      )}
+
+      {activeTab === 'friction' && intelligence && (
+        <FrictionAnalytics stats={intelligence.feeAndTaxStats} isLoading={isIntelLoading} />
+      )}
+
+      {activeTab === 'simulator' && intelligence && (
+        <WealthSimulator stats={intelligence.wealthProjection} isLoading={isIntelLoading} />
+      )}
+
+      {activeTab === 'dividends' && (
+        <DividendAnalytics data={dividends} isLoading={isAnalyticsLoading} />
       )}
     </div>
   );

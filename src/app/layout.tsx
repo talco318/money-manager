@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/AuthProvider";
+import { PrivacyProvider } from "@/contexts/PrivacyContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,8 +15,25 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Portfolio Manager - ניהול תיק השקעות",
-  description: "מערכת לניהול תיק השקעות עם מעקב אחזקות, גרפים והתראות",
+  title: "Money Manager - ניהול תיק השקעות",
+  description: "מערכת חכמה לניהול תיק השקעות, מעקב דיבידנדים ותובנות פיננסיות",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "MoneyManager",
+  },
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
+};
+
+export const viewport = {
+  themeColor: "#0f172a",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -27,7 +45,9 @@ export default function RootLayout({
     <html lang="he" dir="rtl" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <AuthProvider>
-          {children}
+          <PrivacyProvider>
+            {children}
+          </PrivacyProvider>
         </AuthProvider>
       </body>
     </html>

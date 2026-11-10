@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getPortfolioIntelligence } from '@/lib/analytics/intelligence';
 
 interface DividendBySymbol {
   symbol: string;
@@ -32,6 +33,15 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'all';
     const year = searchParams.get('year');
+
+    // Portfolio Intelligence & Lifecycle Analytics
+    if (type === 'intelligence') {
+      const intelligence = await getPortfolioIntelligence();
+      return NextResponse.json({
+        success: true,
+        data: intelligence,
+      });
+    }
 
     const result: {
       dividends?: {
