@@ -63,7 +63,7 @@ export function ChartsPage() {
         {/* S&P 500 Comparison */}
         <Card 
           title="השוואה ל-S&P 500" 
-          subtitle="תשואה באחוזים"
+          subtitle="תשואה באחוזים (משוקלל הפקדות ותזרים)"
         >
           <SP500ComparisonChart data={performanceData} isLoading={isLoading} />
         </Card>
