@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useSettings } from '@/hooks';
 import { Card, Button, Select, Input, Modal } from '@/components/ui';
 import { SecuritySettingsCard } from './SecuritySettingsCard';
+import { triggerPwaInstall } from '@/components/pwa/PwaInstaller';
+import { Smartphone, Download } from 'lucide-react';
 
 export function SettingsPage() {
   const { settings, isLoading, error, updateSettings, deleteAllData, exportData } = useSettings();
@@ -84,6 +86,48 @@ export function SettingsPage() {
         {/* Security & Biometrics */}
         <div className="lg:col-span-2">
           <SecuritySettingsCard />
+        </div>
+
+        {/* PWA Mobile Installation Card */}
+        <div className="lg:col-span-2">
+          <Card title="אפליקציה למובייל (PWA)" subtitle="התקנת המערכת כאפליקציה עצמאית בנייד">
+            <div className="space-y-4">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md">
+                    <Smartphone className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-white">
+                      התקנה על מסך הבית (אנדרואיד / iOS)
+                    </h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      מאפשרת פתיחה ישירה, עבודה במסך מלא ללא דפדפן, ואבטחה ביומטרית
+                    </p>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={triggerPwaInstall}
+                  className="rounded-xl flex items-center gap-2 self-start sm:self-auto bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>התקן אפליקציה</span>
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-600 dark:text-gray-400">
+                <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800">
+                  <span className="font-bold text-gray-900 dark:text-white block mb-1">🤖 אנדרואיד (Chrome):</span>
+                  לחץ על 3 הנקודות ⋮ בפינת הדפדפן ובחר &quot;התקן אפליקציה&quot; או &quot;הוסף למסך הבית&quot;.
+                </div>
+                <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800">
+                  <span className="font-bold text-gray-900 dark:text-white block mb-1">🍎 אייפון (Safari):</span>
+                  לחץ על כפתור השיתוף בתחתית המסך ובחר &quot;הוסף למסך הבית&quot;.
+                </div>
+              </div>
+            </div>
+          </Card>
         </div>
 
         {/* General Settings */}

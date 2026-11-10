@@ -5,7 +5,21 @@ import { usePortfolio } from '@/hooks';
 import { StatCard, Card, Button } from '@/components/ui';
 import { HoldingsTable } from './HoldingsTable';
 import { usePrivacy } from '@/contexts/PrivacyContext';
-import { Eye, EyeOff, Sparkles, ArrowLeft } from 'lucide-react';
+import { triggerPwaInstall } from '@/components/pwa/PwaInstaller';
+import {
+  Eye,
+  EyeOff,
+  Sparkles,
+  ArrowLeft,
+  UploadCloud,
+  PlusCircle,
+  TrendingUp,
+  Smartphone,
+  RefreshCw,
+  Coins,
+  ShieldCheck,
+  Zap,
+} from 'lucide-react';
 
 function formatCurrency(value: number, currency: string = 'USD'): string {
   const formatter = new Intl.NumberFormat(currency === 'ILS' ? 'he-IL' : 'en-US', {
@@ -15,11 +29,6 @@ function formatCurrency(value: number, currency: string = 'USD'): string {
     maximumFractionDigits: 2,
   });
   return formatter.format(value);
-}
-
-function formatPercent(value: number): string {
-  const sign = value >= 0 ? '+' : '';
-  return `${sign}${value.toFixed(2)}%`;
 }
 
 export function Dashboard() {
@@ -44,63 +53,146 @@ export function Dashboard() {
   const fmt = (val: number, cur: string = 'USD') => maskAmount(formatCurrency(val, cur));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-300">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">דשבורד</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">סקירה כללית של תיק ההשקעות שלך</p>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
+              דשבורד התיק
+            </h1>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/40">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              חי 24/7
+            </span>
+          </div>
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
+            סקירה מרוכזת של הנכסים, התשואות, יתרות המזומן ורווחי ההון
+          </p>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* Privacy Mode Toggle */}
+
+        <div className="flex items-center gap-2 sm:gap-3 self-end sm:self-auto flex-wrap">
+          {/* Privacy Toggle */}
           <button
             onClick={togglePrivacy}
-            className="px-3 py-1.5 text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-1.5 text-xs font-semibold"
-            title={isPrivate ? "בטל מצב פרטיות" : "הפעל מצב פרטיות (הסתרת סכומים)"}
+            className="px-3.5 py-2 text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/80 transition-all flex items-center gap-2 text-xs font-bold shadow-2xs cursor-pointer"
+            title={isPrivate ? 'בטל מצב פרטיות' : 'הפעל מצב פרטיות (הסתרת סכומים)'}
           >
             {isPrivate ? <EyeOff className="w-4 h-4 text-amber-500" /> : <Eye className="w-4 h-4" />}
-            <span className="hidden sm:inline">{isPrivate ? "חשוף סכומים" : "מצב פרטיות"}</span>
+            <span>{isPrivate ? 'חשוף סכומים' : 'מצב פרטיות'}</span>
           </button>
 
-          {lastUpdated && (
-            <span className="text-xs text-gray-400 dark:text-gray-500 hidden md:inline">
-              עודכן: {lastUpdated.toLocaleTimeString('he-IL')}
-            </span>
-          )}
-          <Button 
-            onClick={refresh} 
-            variant="outline" 
+          {/* Refresh Button */}
+          <Button
+            onClick={refresh}
+            variant="outline"
             size="sm"
             disabled={isLoading}
-            className="rounded-xl text-xs font-semibold"
+            className="rounded-xl text-xs font-bold flex items-center gap-1.5 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
           >
-            {isLoading ? 'טוען...' : 'רענן נתונים'}
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <span>{isLoading ? 'מרענן...' : 'רענן'}</span>
           </Button>
         </div>
       </div>
 
-      {/* Financial Intelligence Shortcut Banner */}
+      {/* Quick Action Chips Ribbon */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <Link
+          href="/import"
+          className="p-3 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 hover:border-blue-500/50 hover:shadow-xs transition-all flex items-center gap-2.5 group"
+        >
+          <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <UploadCloud className="w-4 h-4" />
+          </div>
+          <div className="min-w-0 text-right">
+            <span className="text-xs font-bold text-gray-900 dark:text-white block truncate">
+              ייבוא אקסל
+            </span>
+            <span className="text-[10px] text-gray-400 block truncate">
+              ממיטב טרייד
+            </span>
+          </div>
+        </Link>
+
+        <Link
+          href="/analytics"
+          className="p-3 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 hover:border-purple-500/50 hover:shadow-xs transition-all flex items-center gap-2.5 group"
+        >
+          <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+          </div>
+          <div className="min-w-0 text-right">
+            <span className="text-xs font-bold text-gray-900 dark:text-white block truncate">
+              מודיעין ותובנות
+            </span>
+            <span className="text-[10px] text-purple-500 font-bold block truncate">
+              Sharpe, תרחישי קיצון
+            </span>
+          </div>
+        </Link>
+
+        <Link
+          href="/transactions"
+          className="p-3 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 hover:border-emerald-500/50 hover:shadow-xs transition-all flex items-center gap-2.5 group"
+        >
+          <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <PlusCircle className="w-4 h-4" />
+          </div>
+          <div className="min-w-0 text-right">
+            <span className="text-xs font-bold text-gray-900 dark:text-white block truncate">
+              יומן עסקאות
+            </span>
+            <span className="text-[10px] text-gray-400 block truncate">
+              קניות, מכירות, דיבידנד
+            </span>
+          </div>
+        </Link>
+
+        <button
+          onClick={triggerPwaInstall}
+          className="p-3 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 hover:border-teal-500/50 hover:shadow-xs transition-all flex items-center gap-2.5 group text-right cursor-pointer"
+        >
+          <div className="w-8 h-8 rounded-xl bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <Smartphone className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-xs font-bold text-gray-900 dark:text-white block truncate">
+              התקן לנייד
+            </span>
+            <span className="text-[10px] text-emerald-500 font-bold block truncate">
+              PWA מסך בית
+            </span>
+          </div>
+        </button>
+      </div>
+
+      {/* Intelligence Banner */}
       <Link
         href="/analytics"
-        className="block p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xs hover:shadow-md hover:scale-[1.005] transition-all"
+        className="block p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-md hover:shadow-lg hover:scale-[1.003] transition-all"
       >
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center shrink-0">
-              <Sparkles className="w-5 h-5 text-amber-300" />
+            <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0 shadow-inner">
+              <Sparkles className="w-6 h-6 text-amber-300" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-extrabold text-sm sm:text-base">מודיעין ותובנות פיננסיות</h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-gray-900">חדש!</span>
+                <h3 className="font-black text-sm sm:text-base tracking-tight">
+                  מודיעין פיננסי ואנליטיקת עומק
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-gray-900 shadow-2xs">
+                  חדש!
+                </span>
               </div>
-              <p className="text-xs text-blue-100 mt-0.5 line-clamp-1">
-                בדוק מה החזקת בעבר, רווח ממומש לכיס, שיעור הצלחה, סימולטור &quot;מה אם לא הייתי מוכר?&quot; ועוד
+              <p className="text-xs text-blue-100 mt-1 line-clamp-1">
+                מדדי שארפ וסורטינו, סימולטור תרחישי קיצון, פירוק תשואת מט"ח (FX vs Asset), ולוח דיבידנדים חזוי
               </p>
             </div>
           </div>
-          <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-white/20 backdrop-blur-md flex items-center gap-1 shrink-0">
-            <span>צפה</span>
+          <span className="text-xs font-black px-3.5 py-2 rounded-xl bg-white/20 backdrop-blur-md flex items-center gap-1.5 shrink-0 shadow-xs">
+            <span>פתח</span>
             <ArrowLeft className="w-3.5 h-3.5" />
           </span>
         </div>
@@ -108,18 +200,18 @@ export function Dashboard() {
 
       {/* Error Alert */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <p className="text-red-800 dark:text-red-200">{error}</p>
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4">
+          <p className="text-red-800 dark:text-red-200 text-xs font-semibold">{error}</p>
         </div>
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
         <StatCard
-          title="שווי התיק"
+          title="שווי התיק הכולל"
           value={isLoading ? '---' : fmt(totalValueILS, 'ILS')}
           subtitle={isLoading ? '---' : fmt(totalValue, 'USD')}
-          icon={<span className="text-2xl">💰</span>}
+          icon={<Coins className="w-4 h-4 text-amber-500" />}
         />
         <StatCard
           title="רווח/הפסד כולל"
@@ -128,110 +220,119 @@ export function Dashboard() {
             isLoading
               ? '---'
               : netDepositsILS > 0
-                ? `${fmt(totalPnL, 'USD')} • הפקדות נטו: ${fmt(netDepositsILS, 'ILS')}`
-                : fmt(totalPnL, 'USD')
+              ? `${fmt(totalPnL, 'USD')} • הפקדות נטו: ${fmt(netDepositsILS, 'ILS')}`
+              : fmt(totalPnL, 'USD')
           }
           trend={isLoading ? undefined : { value: totalPnLPercent, isPositive: isProfitable }}
-          icon={<span className="text-2xl">{isProfitable ? '📈' : '📉'}</span>}
+          icon={<TrendingUp className="w-4 h-4 text-emerald-500" />}
         />
         <StatCard
-          title="שינוי יומי"
+          title="שינוי יומי (Daily PnL)"
           value={isLoading ? '---' : `${isDayPositive ? '+' : ''}${fmt(dayChange * usdIlsRate, 'ILS')}`}
           subtitle={isLoading ? '---' : `${isDayPositive ? '+' : ''}${fmt(dayChange, 'USD')}`}
           trend={isLoading ? undefined : { value: dayChangePercent, isPositive: isDayPositive }}
-          icon={<span className="text-2xl">{isDayPositive ? '🟢' : '🔴'}</span>}
+          icon={<Zap className="w-4 h-4 text-blue-500" />}
         />
         <StatCard
-          title="מספר אחזקות"
+          title="מספר אחזקות פעילות"
           value={isLoading ? '---' : holdings.length.toString()}
-          subtitle={isLoading ? '---' : 'מניות וקרנות סל פעילות'}
-          icon={<span className="text-2xl">📊</span>}
+          subtitle={isLoading ? '---' : 'מניות וקרנות סל בתיק'}
+          icon={<ShieldCheck className="w-4 h-4 text-purple-500" />}
         />
       </div>
 
-      {/* Cash Balances Section - Styled with Figma Card Aesthetic */}
-      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-xs border border-gray-100 dark:border-gray-700/60">
+      {/* Cash Balances Section */}
+      <div className="bg-white dark:bg-gray-900 rounded-3xl p-5 sm:p-6 shadow-xs border border-gray-100 dark:border-gray-800">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
           <div>
-            <div className="flex items-center gap-2.5">
-              <span className="text-xl">💳</span>
-              <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">יתרות מזומן בחשבון (מיטב טרייד)</h2>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                <Coins className="w-4 h-4" />
+              </div>
+              <h2 className="text-base font-black text-gray-900 dark:text-white tracking-tight">
+                יתרות מזומן בחשבון (מיטב טרייד)
+              </h2>
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              יתרות המזומן הזמינות לפעילות, משוקללות בתוך שווי התיק הכולל
+              יתרות המזומן הנזילות לפעילות, משוקללות בשווי הכולל של התיק
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* ILS Cash */}
-            <div className="bg-[#f8fafc] dark:bg-gray-700/40 rounded-2xl p-4 border border-gray-100 dark:border-gray-700/60">
-              <span className="text-xs text-gray-500 dark:text-gray-400 font-medium block mb-1">
+            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-4 border border-gray-100 dark:border-gray-800">
+              <span className="text-xs text-gray-500 dark:text-gray-400 font-semibold block mb-1">
                 🇮🇱 יתרה שקלית (עו"ש)
               </span>
-              <p className="text-lg font-bold text-gray-900 dark:text-white">
+              <p className="text-lg font-black text-gray-900 dark:text-white">
                 {isLoading ? '---' : fmt(cashBalanceILS, 'ILS')}
               </p>
-              <span className="text-[11px] text-gray-400">
-                מעמודת &quot;יתרה שקלית&quot;
+              <span className="text-[10px] text-gray-400">
+                נזיל מיידית בשקלים
               </span>
             </div>
 
             {/* USD Cash */}
-            <div className="bg-[#f8fafc] dark:bg-gray-700/40 rounded-2xl p-4 border border-gray-100 dark:border-gray-700/60">
-              <span className="text-xs text-gray-500 dark:text-gray-400 font-medium block mb-1">
+            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-4 border border-gray-100 dark:border-gray-800">
+              <span className="text-xs text-gray-500 dark:text-gray-400 font-semibold block mb-1">
                 🇺🇸 יתרה דולרית (נייר 99028)
               </span>
-              <p className="text-lg font-bold text-gray-900 dark:text-white">
+              <p className="text-lg font-black text-gray-900 dark:text-white">
                 {isLoading ? '---' : fmt(cashBalanceUSD, 'USD')}
               </p>
-              <span className="text-[11px] text-gray-500 dark:text-gray-400">
+              <span className="text-[10px] text-gray-400">
                 ≈ {isLoading ? '---' : fmt(cashBalanceUSD * usdIlsRate, 'ILS')}
               </span>
             </div>
 
             {/* Total Cash in ILS */}
-            <div className="bg-[#eff6ff] dark:bg-blue-950/30 rounded-2xl p-4 border border-blue-100 dark:border-blue-800/40">
-              <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold block mb-1">
-                💰 סה&quot;כ מזומן משוקלל
+            <div className="bg-blue-50/70 dark:bg-blue-950/30 rounded-2xl p-4 border border-blue-100 dark:border-blue-900/40">
+              <span className="text-xs text-blue-600 dark:text-blue-400 font-bold block mb-1">
+                💰 סה"כ מזומן משוקלל
               </span>
-              <p className="text-lg font-extrabold text-blue-600 dark:text-blue-400">
+              <p className="text-lg font-black text-blue-600 dark:text-blue-400">
                 {isLoading ? '---' : fmt(totalCashILS, 'ILS')}
               </p>
-              <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                {totalValueILS > 0 ? `${((totalCashILS / totalValueILS) * 100).toFixed(1)}% משווי התיק` : 'משוקלל לתיק'}
+              <span className="text-[10px] text-blue-800/70 dark:text-blue-300/70 font-semibold">
+                {totalValueILS > 0 ? `${((totalCashILS / totalValueILS) * 100).toFixed(1)}% משווי התיק` : 'משוקלל'}
               </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Exchange Rate Info */}
-      <div className="inline-flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 px-4 py-2 rounded-2xl border border-gray-100 dark:border-gray-700/60 shadow-xs">
-        <span>שער USD/ILS:</span>
-        <span className="font-bold text-gray-900 dark:text-white">
-          {usdIlsRate.toFixed(4)} ₪
+      {/* Exchange Rate Badge */}
+      <div className="inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-900 px-4 py-2 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-2xs">
+        <span>שער המרה יציג (USD/ILS):</span>
+        <span className="font-black text-gray-900 dark:text-white">
+          ₪{usdIlsRate.toFixed(4)}
         </span>
+        {lastUpdated && (
+          <span className="text-gray-400 text-[10px] mr-2">
+            • עודכן: {lastUpdated.toLocaleTimeString('he-IL')}
+          </span>
+        )}
       </div>
 
       {/* Holdings Table */}
-      <Card 
-        title="אחזקות נוכחיות ומזומן" 
+      <Card
+        title="אחזקות נוכחיות ומזומן"
         subtitle={holdings.length > 0 ? `${holdings.length} ניירות ערך פעילים + יתרות מזומן` : 'מעודכן לפי נתוני שוק'}
         action={
           holdings.length > 0 && (
-            <a 
-              href="/transactions" 
-              className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
+            <Link
+              href="/transactions"
+              className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
             >
-              צפה בכל העסקאות
-            </a>
+              צפה בכל העסקאות ←
+            </Link>
           )
         }
       >
-        <HoldingsTable 
-          holdings={holdings} 
-          isLoading={isLoading} 
-          usdIlsRate={usdIlsRate} 
+        <HoldingsTable
+          holdings={holdings}
+          isLoading={isLoading}
+          usdIlsRate={usdIlsRate}
           cashBalances={{
             ils: cashBalanceILS,
             usd: cashBalanceUSD,
@@ -239,43 +340,6 @@ export function Dashboard() {
           }}
         />
       </Card>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-xs border border-gray-100 dark:border-gray-700/60 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer">
-          <a href="/import" className="block text-center">
-            <span className="w-12 h-12 mx-auto rounded-2xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center text-2xl mb-3">
-              📤
-            </span>
-            <h3 className="font-bold text-gray-900 dark:text-white">ייבוא עסקאות</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              העלה קובץ אקסל ממיטב טרייד
-            </p>
-          </a>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-xs border border-gray-100 dark:border-gray-700/60 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer">
-          <a href="/import?tab=manual" className="block text-center">
-            <span className="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center text-2xl mb-3">
-              📝
-            </span>
-            <h3 className="font-bold text-gray-900 dark:text-white">הוסף עסקה</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              הוספת עסקה ידנית לתיק
-            </p>
-          </a>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-xs border border-gray-100 dark:border-gray-700/60 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer">
-          <a href="/charts" className="block text-center">
-            <span className="w-12 h-12 mx-auto rounded-2xl bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center text-2xl mb-3">
-              📈
-            </span>
-            <h3 className="font-bold text-gray-900 dark:text-white">צפה בגרפים</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              ביצועי תיק והשוואה למדדים
-            </p>
-          </a>
-        </div>
-      </div>
     </div>
   );
 }

@@ -395,3 +395,4 @@ export function StressTesting({ stats, isLoading }: StressTestingProps) {
     </div>
   );
 }
+

@@ -4,8 +4,9 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Money Manager - ניהול תיק השקעות',
     short_name: 'Money Manager',
-    description: 'מערכת חכמה לניהול תיק השקעות ומעקב תשואות, דיבידנדים ומזומן',
-    start_url: '/',
+    description: 'מערכת חכמה ומתקדמת לניהול תיק השקעות, מעקב דיבידנדים ותובנות פיננסיות',
+    id: '/',
+    start_url: '/?source=pwa',
     scope: '/',
     display: 'standalone',
     orientation: 'portrait-primary',
@@ -13,6 +14,8 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#0b1120',
     lang: 'he',
     dir: 'rtl',
+    categories: ['finance', 'productivity', 'utilities'],
+    prefer_related_applications: false,
     icons: [
       {
         src: '/icon-192.png',
@@ -21,16 +24,16 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: 'any',
       },
       {
-        src: '/icon-512.png',
-        sizes: '512x512',
-        type: 'image/png',
-        purpose: 'any',
-      },
-      {
         src: '/icon-maskable-192.png',
         sizes: '192x192',
         type: 'image/png',
         purpose: 'maskable',
+      },
+      {
+        src: '/icon-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any',
       },
       {
         src: '/icon-maskable-512.png',
@@ -49,6 +52,22 @@ export default function manifest(): MetadataRoute.Manifest {
         type: 'image/svg+xml',
       },
     ],
+    shortcuts: [
+      {
+        name: 'דשבורד התיק',
+        url: '/',
+        icons: [{ src: '/icon-192.png', sizes: '192x192' }],
+      },
+      {
+        name: 'מודיעין ותובנות',
+        url: '/analytics',
+        icons: [{ src: '/icon-192.png', sizes: '192x192' }],
+      },
+      {
+        name: 'עסקאות',
+        url: '/transactions',
+        icons: [{ src: '/icon-192.png', sizes: '192x192' }],
+      },
+    ],
   };
 }
-

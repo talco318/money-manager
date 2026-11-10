@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Money Manager - ניהול תיק השקעות",
   description: "מערכת חכמה לניהול תיק השקעות, מעקב דיבידנדים ותובנות פיננסיות",
-  manifest: "/manifest.webmanifest",
+  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
