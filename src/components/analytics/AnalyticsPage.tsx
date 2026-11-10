@@ -10,6 +10,8 @@ import { TradingJournal } from './TradingJournal';
 import { FrictionAnalytics } from './FrictionAnalytics';
 import { RiskExposure } from './RiskExposure';
 import { WealthSimulator } from './WealthSimulator';
+import { TaxLossHarvesting } from './TaxLossHarvesting';
+import { RiskAdjustedMetrics } from './RiskAdjustedMetrics';
 import {
   Trophy,
   Target,
@@ -17,12 +19,16 @@ import {
   Receipt,
   Rocket,
   DollarSign,
+  Scale,
+  Activity,
   RefreshCw,
 } from 'lucide-react';
 
-type Tab = 'positions' | 'journal' | 'exposure' | 'friction' | 'simulator' | 'dividends';
+type Tab = 'positions' | 'journal' | 'exposure' | 'friction' | 'tax-loss' | 'risk-metrics' | 'simulator' | 'dividends';
 
 const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'tax-loss', label: 'קצירת הפסדים ומיטוב מס', icon: Scale },
+  { id: 'risk-metrics', label: 'מדדי סיכון (Sharpe)', icon: Activity },
   { id: 'positions', label: 'מה החזקתי ומתי', icon: Trophy },
   { id: 'journal', label: 'יומן הצלחה ומסחר', icon: Target },
   { id: 'exposure', label: 'חשיפות וסיכון אמיתי', icon: Globe },
@@ -99,6 +105,14 @@ export function AnalyticsPage() {
       )}
 
       {/* Content Rendering */}
+      {activeTab === 'tax-loss' && intelligence && (
+        <TaxLossHarvesting stats={intelligence.taxHarvesting} />
+      )}
+
+      {activeTab === 'risk-metrics' && intelligence && (
+        <RiskAdjustedMetrics stats={intelligence.riskMetrics} />
+      )}
+
       {activeTab === 'positions' && intelligence && (
         <PositionsHistory positions={intelligence.positions} isLoading={isIntelLoading} />
       )}
