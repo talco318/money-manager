@@ -37,15 +37,15 @@ const CACHE_TTL = 15 * 60 * 1000; // 15 minutes in milliseconds
 
 // Israeli securities proxy mapping to Yahoo Finance symbols
 // Note: These funds trade in London/Europe in USD, and their TASE price is directly linked to them via USD/ILS rate!
-const ISRAELI_PROXY_MAPPING: Record<string, { targetSymbol: string; inUSD: boolean }> = {
+const ISRAELI_PROXY_MAPPING: Record<string, { targetSymbol: string; inUSD: boolean; multiplier?: number }> = {
   // iShares Core S&P 500 UCITS ETF (TASE: 1159250 -> LSE: CSPX.L)
   '1159250': { targetSymbol: 'CSPX.L', inUSD: true },
   // iShares MSCI ACWI UCITS ETF (TASE: 1159235 -> LSE: ISAC.L)
   '1159235': { targetSymbol: 'ISAC.L', inUSD: true },
   // iShares Core MSCI EM IMI UCITS ETF (TASE: 1159169 -> LSE: EIMI.L)
   '1159169': { targetSymbol: 'EIMI.L', inUSD: true },
-  // Invesco S&P 500 UCITS ETF (TASE: 1183441 -> LSE: SPXS.L)
-  '1183441': { targetSymbol: 'SPXS.L', inUSD: true },
+  // Invesco S&P 500 UCITS ETF (TASE: 1183441 -> LSE: SPXS.L; 100:1 TASE unit split on 15/12/2025)
+  '1183441': { targetSymbol: 'SPXS.L', inUSD: true, multiplier: 0.01 },
 };
 
 // Fallback market prices for Israeli securities without Yahoo Finance listing
@@ -102,13 +102,19 @@ export async function getQuote(symbol: string): Promise<QuoteData | null> {
     let previousClose = quote.regularMarketPreviousClose || price;
     let currency = quote.currency || 'USD';
 
+    const mult = proxy?.multiplier ?? 1;
+
     // If this is an Israeli fund mapped to an international USD UCITS ETF, convert to ILS
     if (proxy && proxy.inUSD) {
       const rate = await getUsdIlsRate();
-      price = Number((price * rate).toFixed(2));
-      change = Number((change * rate).toFixed(2));
-      previousClose = Number((previousClose * rate).toFixed(2));
+      price = Number((price * rate * mult).toFixed(2));
+      change = Number((change * rate * mult).toFixed(2));
+      previousClose = Number((previousClose * rate * mult).toFixed(2));
       currency = 'ILS';
+    } else if (mult !== 1) {
+      price = Number((price * mult).toFixed(2));
+      change = Number((change * mult).toFixed(2));
+      previousClose = Number((previousClose * mult).toFixed(2));
     }
 
     const quoteData: QuoteData = {
@@ -118,10 +124,10 @@ export async function getQuote(symbol: string): Promise<QuoteData | null> {
       change,
       changePercent: quote.regularMarketChangePercent || 0,
       previousClose,
-      dayHigh: quote.regularMarketDayHigh ? (proxy?.inUSD ? Number((quote.regularMarketDayHigh * (await getUsdIlsRate())).toFixed(2)) : quote.regularMarketDayHigh) : undefined,
-      dayLow: quote.regularMarketDayLow ? (proxy?.inUSD ? Number((quote.regularMarketDayLow * (await getUsdIlsRate())).toFixed(2)) : quote.regularMarketDayLow) : undefined,
-      fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh,
-      fiftyTwoWeekLow: quote.fiftyTwoWeekLow,
+      dayHigh: quote.regularMarketDayHigh ? (proxy?.inUSD ? Number((quote.regularMarketDayHigh * (await getUsdIlsRate()) * mult).toFixed(2)) : quote.regularMarketDayHigh * mult) : undefined,
+      dayLow: quote.regularMarketDayLow ? (proxy?.inUSD ? Number((quote.regularMarketDayLow * (await getUsdIlsRate()) * mult).toFixed(2)) : quote.regularMarketDayLow * mult) : undefined,
+      fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh ? quote.fiftyTwoWeekHigh * mult : undefined,
+      fiftyTwoWeekLow: quote.fiftyTwoWeekLow ? quote.fiftyTwoWeekLow * mult : undefined,
       marketCap: quote.marketCap,
       volume: quote.regularMarketVolume,
       currency,
@@ -257,7 +263,7 @@ export async function getHistoricalData(
 
     const proxy = ISRAELI_PROXY_MAPPING[symbol];
     const fetchSymbol = proxy ? proxy.targetSymbol : symbol;
-    const rate = (proxy && proxy.inUSD) ? await getUsdIlsRate() : 1;
+    const rate = ((proxy && proxy.inUSD) ? await getUsdIlsRate() : 1) * (proxy?.multiplier ?? 1);
 
     const historical = await yahooFinance.historical(fetchSymbol, {
       period1: startDate,

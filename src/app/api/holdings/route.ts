@@ -27,11 +27,15 @@ export async function GET(request: NextRequest) {
       data: {
         holdings,
         cashBalance,
+        deposits: stats.deposits,
         stats: {
           totalCost: stats.totalCost,
           totalHoldings: stats.totalHoldings,
           totalCommissions: stats.totalCommissions,
           totalDividends: stats.totalDividends,
+          totalDepositsILS: stats.deposits.totalDepositsILS,
+          totalWithdrawalsILS: stats.deposits.totalWithdrawalsILS,
+          netDepositsILS: stats.deposits.netDepositsILS,
         },
       },
     });

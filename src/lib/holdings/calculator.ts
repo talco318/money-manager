@@ -296,6 +296,18 @@ export async function repairLegacyTransactions(): Promise<number> {
       }
     }
 
+    // Repair negative cash transfers ("העברה מזומן בשח" with negative totalAmountILS) that were stored as 'deposit' instead of 'withdrawal'
+    const negativeDeposits = await prisma.transaction.updateMany({
+      where: {
+        type: 'deposit',
+        totalAmountILS: { lt: 0 },
+      },
+      data: {
+        type: 'withdrawal',
+      },
+    });
+    repairedCount += negativeDeposits.count;
+
     if (repairedCount > 0) {
       console.log(`Repaired ${repairedCount} legacy transactions in database`);
     }
@@ -384,6 +396,86 @@ export async function calculateCashBalance(): Promise<{ usd: number; ils: number
 }
 
 /**
+ * Calculate total deposits, withdrawals, and net invested capital (in ILS)
+ * from bank cash transfers ("העברה מזומן בשח") and manual deposit/withdrawal entries.
+ */
+export async function calculateDeposits(): Promise<{
+  totalDepositsILS: number;
+  totalWithdrawalsILS: number;
+  netDepositsILS: number;
+}> {
+  const cashMovements = await prisma.transaction.findMany({
+    where: {
+      OR: [
+        { type: { in: ['deposit', 'withdrawal'] } },
+        { rawType: { contains: 'העברה מזומן' } },
+      ],
+    },
+    select: {
+      type: true,
+      rawType: true,
+      symbol: true,
+      name: true,
+      totalAmountILS: true,
+      totalAmountUSD: true,
+      quantity: true,
+      price: true,
+      currency: true,
+    },
+  });
+
+  let totalDepositsILS = 0;
+  let totalWithdrawalsILS = 0;
+
+  for (const tx of cashMovements) {
+    const rawType = (tx.rawType || '').trim();
+    const name = (tx.name || '').trim();
+    const sym = (tx.symbol || '').trim();
+
+    // Skip internal tax-shield movements ("מגן מס", "מס עתידי", "מס לשלם", etc.)
+    if (
+      sym === '9993983' ||
+      sym === '9992983' ||
+      sym === '9992985' ||
+      sym === '9992975' ||
+      name.includes('מגן מס') ||
+      name.includes('מס עתידי') ||
+      name.includes('מס לשלם') ||
+      name.includes('איפוס מגן מס') ||
+      rawType.includes('דיבידנד') ||
+      rawType.includes('מס')
+    ) {
+      continue;
+    }
+
+    let amountILS = tx.totalAmountILS ?? 0;
+
+    // Fallback for manual deposit/withdrawal entries if totalAmountILS wasn't populated
+    if (amountILS === 0 && tx.price && tx.quantity) {
+      const rawVal = tx.price * tx.quantity;
+      amountILS = tx.currency === 'USD' ? rawVal * 3.7 : rawVal;
+    }
+
+    if (amountILS === 0) continue;
+
+    // If explicitly marked as withdrawal (or negative amount from Meitav's "העברה מזומן בשח")
+    if (tx.type === 'withdrawal' || amountILS < 0 || name.includes('העברה ל:')) {
+      totalWithdrawalsILS += Math.abs(amountILS);
+    } else {
+      totalDepositsILS += Math.abs(amountILS);
+    }
+  }
+
+  const netDepositsILS = totalDepositsILS - totalWithdrawalsILS;
+
+  return {
+    totalDepositsILS: Number(totalDepositsILS.toFixed(2)),
+    totalWithdrawalsILS: Number(totalWithdrawalsILS.toFixed(2)),
+    netDepositsILS: Number(netDepositsILS.toFixed(2)),
+  };
+}
+
+/**
  * Get portfolio summary statistics
  */
 export async function getPortfolioStats() {
@@ -406,12 +498,14 @@ export async function getPortfolioStats() {
   });
 
   const totalDividends = Math.abs(dividends._sum.totalAmountUSD || 0);
+  const deposits = await calculateDeposits();
 
   return {
     totalCost,
     totalHoldings,
     totalCommissions,
     totalDividends,
+    deposits,
     holdings,
   };
 }

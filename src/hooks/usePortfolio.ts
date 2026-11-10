@@ -72,12 +72,23 @@ export function usePortfolio(): UsePortfolioResult {
         const emptyCashILS = holdingsData.data.cashBalance?.ils || 0;
         const emptyCashUSD = holdingsData.data.cashBalance?.usd || 0;
         const emptyTotalCashILS = emptyCashILS + (emptyCashUSD * rate);
+        const emptyNetDepositsILS = holdingsData.data.deposits?.netDepositsILS || 0;
+        const emptyTotalDepositsILS = holdingsData.data.deposits?.totalDepositsILS || 0;
+        const emptyTotalWithdrawalsILS = holdingsData.data.deposits?.totalWithdrawalsILS || 0;
+        const emptyPnLILS = emptyNetDepositsILS > 0 ? emptyTotalCashILS - emptyNetDepositsILS : 0;
+        const emptyPnLPercent = emptyNetDepositsILS > 0 ? (emptyPnLILS / emptyNetDepositsILS) * 100 : 0;
         setSummary({
           totalValue: rate > 0 ? emptyTotalCashILS / rate : 0,
           totalValueILS: emptyTotalCashILS,
           totalCost: 0,
-          totalPnL: 0,
-          totalPnLPercent: 0,
+          totalPnL: rate > 0 ? emptyPnLILS / rate : 0,
+          totalPnLILS: emptyPnLILS,
+          totalPnLPercent: emptyPnLPercent,
+          netDepositsILS: emptyNetDepositsILS,
+          totalDepositsILS: emptyTotalDepositsILS,
+          totalWithdrawalsILS: emptyTotalWithdrawalsILS,
+          unrealizedPnLILS: 0,
+          unrealizedPnLPercent: 0,
           dayChange: 0,
           dayChangePercent: 0,
           cashBalance: emptyTotalCashILS,
@@ -188,9 +199,23 @@ export function usePortfolio(): UsePortfolioResult {
       const portfolioTotalValueILS = totalSecuritiesValueILS + totalCashILS;
       const portfolioTotalValueUSD = rate > 0 ? portfolioTotalValueILS / rate : 0;
 
-      const totalPnLILS = totalSecuritiesValueILS - totalSecuritiesCostILS;
+      // Deposits from Excel ("העברה מזומן בשח") and manual entries
+      const netDepositsILS = holdingsData.data.deposits?.netDepositsILS || 0;
+      const totalDepositsILS = holdingsData.data.deposits?.totalDepositsILS || 0;
+      const totalWithdrawalsILS = holdingsData.data.deposits?.totalWithdrawalsILS || 0;
+
+      // Unrealized P&L on open securities alone
+      const unrealizedPnLILS = totalSecuritiesValueILS - totalSecuritiesCostILS;
+      const unrealizedPnLPercent = totalSecuritiesCostILS > 0 ? (unrealizedPnLILS / totalSecuritiesCostILS) * 100 : 0;
+
+      // Total Portfolio P&L relative to actual Net Deposits (fallback to unrealized P&L if no deposits recorded)
+      const totalPnLILS = netDepositsILS > 0
+        ? portfolioTotalValueILS - netDepositsILS
+        : unrealizedPnLILS;
       const totalPnLUSD = rate > 0 ? totalPnLILS / rate : 0;
-      const totalPnLPercent = totalSecuritiesCostILS > 0 ? (totalPnLILS / totalSecuritiesCostILS) * 100 : 0;
+      const totalPnLPercent = netDepositsILS > 0
+        ? (totalPnLILS / netDepositsILS) * 100
+        : unrealizedPnLPercent;
 
       const totalDayChangeUSD = rate > 0 ? totalSecuritiesDayChangeILS / rate : 0;
       const dayChangePercent = totalSecuritiesValueILS > 0 
@@ -203,7 +228,13 @@ export function usePortfolio(): UsePortfolioResult {
         totalValueILS: portfolioTotalValueILS,
         totalCost: rate > 0 ? totalSecuritiesCostILS / rate : 0,
         totalPnL: totalPnLUSD,
+        totalPnLILS,
         totalPnLPercent,
+        netDepositsILS,
+        totalDepositsILS,
+        totalWithdrawalsILS,
+        unrealizedPnLILS,
+        unrealizedPnLPercent,
         dayChange: totalDayChangeUSD,
         dayChangePercent,
         cashBalance: totalCashILS,

@@ -88,7 +88,13 @@ export interface PortfolioSummary {
   totalValueILS: number;
   totalCost: number;
   totalPnL: number;
+  totalPnLILS?: number;
   totalPnLPercent: number;
+  netDepositsILS?: number;
+  totalDepositsILS?: number;
+  totalWithdrawalsILS?: number;
+  unrealizedPnLILS?: number;
+  unrealizedPnLPercent?: number;
   dayChange: number;
   dayChangePercent: number;
   cashBalance: number;

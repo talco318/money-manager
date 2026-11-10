@@ -25,14 +25,16 @@ export function Dashboard() {
   const totalValue = summary?.totalValue || 0;
   const totalValueILS = summary?.totalValueILS || 0;
   const totalPnL = summary?.totalPnL || 0;
+  const totalPnLILS = summary?.totalPnLILS ?? (totalPnL * usdIlsRate);
   const totalPnLPercent = summary?.totalPnLPercent || 0;
+  const netDepositsILS = summary?.netDepositsILS || 0;
   const dayChange = summary?.dayChange || 0;
   const dayChangePercent = summary?.dayChangePercent || 0;
   const cashBalanceILS = summary?.cashBalanceILS || 0;
   const cashBalanceUSD = summary?.cashBalanceUSD || 0;
   const totalCashILS = summary?.totalCashILS || (cashBalanceILS + (cashBalanceUSD * usdIlsRate));
 
-  const isProfitable = totalPnL >= 0;
+  const isProfitable = totalPnLILS >= 0;
   const isDayPositive = dayChange >= 0;
 
   return (
@@ -77,8 +79,14 @@ export function Dashboard() {
         />
         <StatCard
           title="רווח/הפסד כולל"
-          value={isLoading ? '---' : formatCurrency(totalPnL * usdIlsRate, 'ILS')}
-          subtitle={isLoading ? '---' : formatCurrency(totalPnL, 'USD')}
+          value={isLoading ? '---' : formatCurrency(totalPnLILS, 'ILS')}
+          subtitle={
+            isLoading
+              ? '---'
+              : netDepositsILS > 0
+                ? `${formatCurrency(totalPnL, 'USD')} • הפקדות נטו: ${formatCurrency(netDepositsILS, 'ILS')}`
+                : formatCurrency(totalPnL, 'USD')
+          }
           trend={isLoading ? undefined : { value: totalPnLPercent, isPositive: isProfitable }}
           icon={<span className="text-2xl">{isProfitable ? '📈' : '📉'}</span>}
         />

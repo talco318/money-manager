@@ -311,10 +311,9 @@ function shouldImportTransaction(row: Record<string, unknown>): boolean {
   // Skip transactions without meaningful data
   if (!rawType) return false;
 
-  // Skip currency exchange transactions (B USD/ILS, 99028)
+  // Always import currency exchange transactions (B USD/ILS, 99028) so USD cash balance is accurate
   if (isCurrencyExchangeRow(rawType, name, rawSymbol)) {
-    console.log(`Skipping currency exchange: ${rawType} - ${name} - ${rawSymbol}`);
-    return false;
+    return true;
   }
 
   // Skip internal tax operations (tax shield, future tax, etc.)
@@ -397,7 +396,11 @@ function parseRow(row: Record<string, unknown>): TransactionInput | null {
     };
   }
 
-  const type = mapTransactionType(rawType);
+  let type = mapTransactionType(rawType);
+  const rawTotalILS = row.totalAmountILS ? Number(row.totalAmountILS) : undefined;
+  if (type === 'deposit' && ((rawTotalILS !== undefined && rawTotalILS < 0) || rawName.includes('העברה ל:'))) {
+    type = 'withdrawal';
+  }
   const symbol = cleanSymbol(rawSymbol, rawName);
   
   const currencyStr = String(row.currency || '').trim();
