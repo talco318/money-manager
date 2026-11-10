@@ -15,6 +15,8 @@ import { RiskAdjustedMetrics } from './RiskAdjustedMetrics';
 import { StressTesting } from './StressTesting';
 import { FxAttribution } from './FxAttribution';
 import { DividendYocDashboard } from './DividendYocDashboard';
+import { CpiTaxShield } from './CpiTaxShield';
+import { BehavioralAudit } from './BehavioralAudit';
 import {
   Trophy,
   Target,
@@ -28,9 +30,13 @@ import {
   ArrowRightLeft,
   Coins,
   RefreshCw,
+  ShieldCheck,
+  Brain,
 } from 'lucide-react';
 
 type Tab =
+  | 'cpi-shield'
+  | 'behavioral-audit'
   | 'tax-loss'
   | 'risk-metrics'
   | 'stress-test'
@@ -44,6 +50,8 @@ type Tab =
   | 'dividends';
 
 const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'cpi-shield', label: "ארביטראז' מדד (CPI Shield)", icon: ShieldCheck },
+  { id: 'behavioral-audit', label: 'בוחן החלטות ו-FOMO', icon: Brain },
   { id: 'tax-loss', label: 'קצירת הפסדים ומיטוב מס', icon: Scale },
   { id: 'risk-metrics', label: 'מדדי סיכון (Sharpe)', icon: Activity },
   { id: 'stress-test', label: 'סימולטור קיצון (Stress)', icon: ShieldAlert },
@@ -58,7 +66,7 @@ const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: st
 ];
 
 export function AnalyticsPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('tax-loss');
+  const [activeTab, setActiveTab] = useState<Tab>('cpi-shield');
   const { dividends, isLoading: isAnalyticsLoading, refresh: refreshAnalytics } = useAnalytics();
   const { data: intelligence, isLoading: isIntelLoading, refresh: refreshIntel, error: intelError } = useIntelligence();
 
@@ -77,7 +85,7 @@ export function AnalyticsPage() {
             מודיעין ותובנות פיננסיות
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            ניתוח עומק של ביצועים, מדדי סיכון Sharpe/Sortino, סימולציות קיצון, פירוק תשואת מט"ח ו-YOC
+            ארביטראז' מדד בקרנות כספיות, בוחן החלטות ו-FOMO, מדדי שארפ, סימולציות קיצון ופירוק מט"ח
           </p>
         </div>
 
@@ -86,7 +94,7 @@ export function AnalyticsPage() {
           size="sm"
           onClick={handleRefresh}
           disabled={isLoading}
-          className="rounded-xl flex items-center gap-1.5 self-end sm:self-auto"
+          className="rounded-xl flex items-center gap-1.5 self-end sm:self-auto cursor-pointer"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
           {isLoading ? 'מרענן...' : 'רענן תובנות'}
@@ -103,7 +111,7 @@ export function AnalyticsPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer ${
                   isActive
                     ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs'
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -125,6 +133,14 @@ export function AnalyticsPage() {
       )}
 
       {/* Content Rendering */}
+      {activeTab === 'cpi-shield' && intelligence && (
+        <CpiTaxShield stats={intelligence.cpiTaxShield} isLoading={isIntelLoading} />
+      )}
+
+      {activeTab === 'behavioral-audit' && intelligence && (
+        <BehavioralAudit stats={intelligence.behavioralAudit} isLoading={isIntelLoading} />
+      )}
+
       {activeTab === 'tax-loss' && intelligence && (
         <TaxLossHarvesting stats={intelligence.taxHarvesting} />
       )}
