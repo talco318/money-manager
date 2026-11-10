@@ -176,3 +176,4 @@ Generate-Icon -size 64  -outputPath "public\favicon-64.png"
 Generate-Icon -size 32  -outputPath "public\favicon-32.png"
 Generate-Icon -size 512 -outputPath "src\app\icon.png"
 Generate-Icon -size 180 -outputPath "src\app\apple-icon.png"
+

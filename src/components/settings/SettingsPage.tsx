@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useSettings } from '@/hooks';
 import { Card, Button, Select, Input, Modal } from '@/components/ui';
+import { SecuritySettingsCard } from './SecuritySettingsCard';
 
 export function SettingsPage() {
   const { settings, isLoading, error, updateSettings, deleteAllData, exportData } = useSettings();
@@ -80,6 +81,11 @@ export function SettingsPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Security & Biometrics */}
+        <div className="lg:col-span-2">
+          <SecuritySettingsCard />
+        </div>
+
         {/* General Settings */}
         <Card title="הגדרות כלליות" subtitle="הגדרות בסיסיות של המערכת">
           <div className="space-y-5">

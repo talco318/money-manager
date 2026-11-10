@@ -2,8 +2,9 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Menu, Zap, Eye, EyeOff } from 'lucide-react';
+import { Menu, Zap, Eye, EyeOff, Lock, Fingerprint } from 'lucide-react';
 import { usePrivacy } from '@/contexts/PrivacyContext';
+import { useSecurity } from '@/contexts/SecurityContext';
 
 interface MobileHeaderProps {
   onOpenMenu: () => void;
@@ -11,6 +12,7 @@ interface MobileHeaderProps {
 
 export function MobileHeader({ onOpenMenu }: MobileHeaderProps) {
   const { isPrivate, togglePrivacy } = usePrivacy();
+  const { isBiometricEnabled, hasPin, lockApp } = useSecurity();
 
   return (
     <header className="lg:hidden flex items-center justify-between bg-white dark:bg-gray-800 rounded-2xl px-5 py-3.5 mb-4 shadow-xs border border-gray-100 dark:border-gray-700/60">
@@ -24,6 +26,17 @@ export function MobileHeader({ onOpenMenu }: MobileHeaderProps) {
       </Link>
 
       <div className="flex items-center gap-1.5">
+        {(isBiometricEnabled || hasPin) && (
+          <button
+            onClick={lockApp}
+            className="p-2 rounded-xl text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors"
+            title="נעל אפליקציה עכשיו (טביעת אצבע / PIN)"
+            aria-label="נעל אפליקציה"
+          >
+            <Lock className="w-5 h-5" />
+          </button>
+        )}
+
         <button
           onClick={togglePrivacy}
           className="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"

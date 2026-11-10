@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { PrivacyProvider } from "@/contexts/PrivacyContext";
+import { SecurityProvider } from "@/contexts/SecurityContext";
+import { BiometricLockScreen } from "@/components/security/BiometricLockScreen";
 import { PwaInstaller } from "@/components/pwa/PwaInstaller";
 
 const geistSans = Geist({
@@ -54,10 +56,13 @@ export default function RootLayout({
     <html lang="he" dir="rtl" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <AuthProvider>
-          <PrivacyProvider>
-            {children}
-            <PwaInstaller />
-          </PrivacyProvider>
+          <SecurityProvider>
+            <PrivacyProvider>
+              {children}
+              <PwaInstaller />
+              <BiometricLockScreen />
+            </PrivacyProvider>
+          </SecurityProvider>
         </AuthProvider>
       </body>
     </html>

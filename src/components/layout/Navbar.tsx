@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Lock } from 'lucide-react';
 import { usePrivacy } from '@/contexts/PrivacyContext';
+import { useSecurity } from '@/contexts/SecurityContext';
 
 const navItems = [
   { href: '/', label: 'דשבורד', icon: '📊' },
@@ -20,6 +21,7 @@ export function Navbar() {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { isPrivate, togglePrivacy } = usePrivacy();
+  const { isBiometricEnabled, hasPin, lockApp } = useSecurity();
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const closeMenu = () => setIsMenuOpen(false);
@@ -59,8 +61,19 @@ export function Navbar() {
             })}
           </div>
 
-          {/* Privacy Toggle & Mobile Button */}
+          {/* Privacy Toggle, Security Lock & Mobile Button */}
           <div className="flex items-center gap-2">
+            {(isBiometricEnabled || hasPin) && (
+              <button
+                onClick={lockApp}
+                className="p-2 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors"
+                title="נעל אפליקציה עכשיו"
+                aria-label="נעל אפליקציה"
+              >
+                <Lock className="w-5 h-5" />
+              </button>
+            )}
+
             <button
               onClick={togglePrivacy}
               className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
